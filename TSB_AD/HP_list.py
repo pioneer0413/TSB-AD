@@ -50,6 +50,11 @@ Multi_algo_HP_dict = {
         'window_size': [50, 100, 150],
         'num_channel': [[32, 32, 40], [16, 32, 64]]
     },
+    'SpikeCNN': {
+        'window_size': [50, 100, 150],
+        'num_channel': [[32, 40], [32, 64]],
+        'num_enc_features': [4, 8, 16]
+    },
     'LSTMAD': {
         'window_size': [50, 100, 150],
         'lr': [0.0004, 0.0008]
@@ -104,6 +109,7 @@ Optimal_Multi_algo_HP_dict = {
     'RobustPCA': {'max_iter': 1000},
     'AutoEncoder': {'hidden_neurons': [128, 64]},
     'CNN': {'window_size': 50, 'num_channel': [32, 32, 40]},
+    'SpikeCNN': {'window_size': 50, 'num_channel': [32, 40], 'num_enc_features': 8},
     'LSTMAD': {'window_size': 150, 'lr': 0.0008},  
     'TranAD': {'win_size': 10, 'lr': 0.001},  
     'AnomalyTransformer': {'win_size': 50, 'lr': 0.001},  

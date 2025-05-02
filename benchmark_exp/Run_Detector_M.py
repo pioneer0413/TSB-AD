@@ -10,6 +10,8 @@ from TSB_AD.evaluation.metrics import get_metrics
 from TSB_AD.utils.slidingWindows import find_length_rank
 from TSB_AD.model_wrapper import *
 from TSB_AD.HP_list import Optimal_Multi_algo_HP_dict
+from TSB_AD.snn.params import running_params
+import random
 
 # seeding
 seed = 2024
@@ -17,7 +19,7 @@ torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
-random.seed(seed)
+
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
@@ -29,34 +31,130 @@ if __name__ == '__main__':
     Start_T = time.time()
     ## ArgumentParser
     parser = argparse.ArgumentParser(description='Generating Anomaly Score')
-    parser.add_argument('--dataset_dir', type=str, default='../Datasets/TSB-AD-M/')
-    parser.add_argument('--file_lsit', type=str, default='../Datasets/File_List/TSB-AD-M-Eva.csv')
-    parser.add_argument('--score_dir', type=str, default='eval/score/multi/')
-    parser.add_argument('--save_dir', type=str, default='eval/metrics/multi/')
-    parser.add_argument('--save', type=bool, default=False)
-    parser.add_argument('--AD_Name', type=str, default='IForest')
+    parser.add_argument('--dataset_dir', type=str, default='/home/hwkang/TSB-AD/Datasets/TSB-AD-M')
+    parser.add_argument('--file_list', type=str, default='/home/hwkang/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv')
+    parser.add_argument('--score_dir', type=str, default='/home/hwkang/TSB-AD/eval/score/multi/')
+    parser.add_argument('--save_dir', type=str, default='/home/hwkang/TSB-AD/eval/metrics/multi/')
+    parser.add_argument('--save', action='store_true', default=False)
+    parser.add_argument('--AD_Name', type=str, default='SpikeCNN')
+    parser.add_argument('--Encoder_Name', type=str, default=None)
+    parser.add_argument('--postfix', type=str, default=None)
+    parser.add_argument('--overwrite', action='store_true', default=False) # False=skip, True=overwrite
+
+    # Visualization
+    parser.add_argument('--verbose', action='store_true', default=False)
+    parser.add_argument('--save_encoding', action='store_true', default=False)
+    parser.add_argument('--trace_threshold', action='store_true', default=False)
+    parser.add_argument('--early_stop_off', action='store_false', default=True)
+
+    # Independent Variables
+    parser.add_argument('--learn_threshold', action='store_true', default=False)
+    parser.add_argument('--granularity', type=str, default='neuron')
+    parser.add_argument('--threshold_init', type=str, default='all-1s')  # updated default value
+    parser.add_argument('--normalization_layer', type=str, default='bn')
+    parser.add_argument('--second_chance', action='store_true', default=False)
+    parser.add_argument('--sub_threshold_type', type=str, default='exponential')
+    parser.add_argument('--ternary', action='store_true', default=False)
+    parser.add_argument('--supra_threshold_type', type=str, default='linear')
+    parser.add_argument('--adaptive_margin', action='store_true', default=False)
     args = parser.parse_args()
 
+    # Reset Independent Variable of running_params
+    local_running_params = running_params.copy()
 
-    target_dir = os.path.join(args.score_dir, args.AD_Name)
+    local_running_params['verbose'] = args.verbose
+    local_running_params['save_encoding'] = args.save_encoding
+    local_running_params['trace_threshold'] = args.trace_threshold
+    local_running_params['early_stop'] = args.early_stop_off
+
+    local_running_params['encoders']['learn_threshold'] = args.learn_threshold
+    local_running_params['encoders']['granularity'] = args.granularity
+    local_running_params['encoders']['threshold_init'] = args.threshold_init
+    local_running_params['encoders']['normalization_layer']['type'] = args.normalization_layer
+    local_running_params['encoders']['second_chance'] = args.second_chance
+    local_running_params['encoders']['sub_threshold']['type'] = args.sub_threshold_type
+    local_running_params['encoders']['ternary'] = args.ternary
+    local_running_params['encoders']['supra_threshold']['type'] = args.supra_threshold_type
+    local_running_params['encoders']['sub_threshold']['linear']['adaptive_margin'] = args.adaptive_margin  # new mapping
+    local_running_params['encoders']['supra_threshold']['linear']['adaptive_margin'] = args.adaptive_margin   # new mapping
+
+    if args.Encoder_Name is not None:
+        target_dir = os.path.join(args.score_dir, args.AD_Name, args.Encoder_Name)
+    else:
+        target_dir = os.path.join(args.score_dir, args.AD_Name)
+
+    if args.postfix is not None:
+        target_dir = os.path.join(target_dir, args.postfix)
     os.makedirs(target_dir, exist_ok = True)
-    logging.basicConfig(filename=f'{target_dir}/000_run_{args.AD_Name}.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    file_list = pd.read_csv(args.file_lsit)['file_name'].values
+    # 같은 파일 코드 생성 방지를 위해 0.1~0.5초 사이의 랜덤한 숫자 생성
+    random_num = random.uniform(0.1, 0.3)
+    # random_num 동안 대기
+    time.sleep(random_num)
+    random.seed(seed)
+
+    log_dir_path = '/home/hwkang/TSB-AD/logs'
+    os.makedirs(log_dir_path, exist_ok=True)
+    # log_dir_path의 파일 리스트 가져오기
+    log_files = os.listdir(log_dir_path)
+    # log_dir_path에 있는 파일 중에서 가장 큰 숫자를 찾기
+    max_num = 0
+    id_code = 0
+    if len(log_files) > 0:
+        for file in log_files:
+            segments = file.split('_')
+            file_number = int(segments[0])
+            if file_number > max_num:
+                max_num = file_number
+        file_number = max_num + 1
+        # 새로운 파일 이름 생성
+        if args.Encoder_Name is not None:
+            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.Encoder_Name}.log'
+        else:
+            file_name = f'{file_number:03d}_run_{args.AD_Name}.log'
+    else:
+        file_number = 0
+        # 새로운 파일 이름 생성
+        if args.Encoder_Name is not None:
+            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.Encoder_Name}.log'
+        else:
+            file_name = f'{file_number:03d}_run_{args.AD_Name}.log'
+    log_file_path = os.path.join(log_dir_path, file_name)
+    id_code = file_number
+
+    with open(log_file_path, 'w') as f:
+        f.write('Arguments:\n')
+        for key, value in vars(args).items():
+            f.write(f'{key}: {value}\n')
+        
+        f.write('\n')
+        f.write('Running Configurations:\n')
+        for key, value in local_running_params.items():
+            f.write(f'{key}: {value}\n')
+
+        # 실행 시작 시점 기록
+        f.write('\n')
+        f.write('Execution Start Time: {}\n'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+
+    if args.Encoder_Name is not None:
+        logging.basicConfig(filename=f'{target_dir}/000_run_{args.AD_Name}_{args.Encoder_Name}.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    else:
+        logging.basicConfig(filename=f'{target_dir}/000_run_{args.AD_Name}.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    file_list = pd.read_csv(args.file_list)['file_name'].values
     Optimal_Det_HP = Optimal_Multi_algo_HP_dict[args.AD_Name]
-    print('Optimal_Det_HP: ', Optimal_Det_HP)
+    #print('Optimal_Det_HP: ', Optimal_Det_HP)
 
     write_csv = []
+    execution_status = []
     for filename in file_list:
-        if os.path.exists(target_dir+'/'+filename.split('.')[0]+'.npy'): continue
+        if os.path.exists(target_dir+'/'+filename.split('.')[0]+'.npy') and args.overwrite is False : continue
         print('Processing:{} by {}'.format(filename, args.AD_Name))
 
         file_path = os.path.join(args.dataset_dir, filename)
         df = pd.read_csv(file_path).dropna()
         data = df.iloc[:, 0:-1].values.astype(float)
         label = df['Label'].astype(int).to_numpy()
-        # print('data: ', data.shape)
-        # print('label: ', label.shape)
 
         feats = data.shape[1]
         slidingWindow = find_length_rank(data[:,0].reshape(-1, 1), rank=1)
@@ -65,12 +163,15 @@ if __name__ == '__main__':
 
         start_time = time.time()
 
-        if args.AD_Name in Semisupervise_AD_Pool:
-            output = run_Semisupervise_AD(args.AD_Name, data_train, data, **Optimal_Det_HP)
-        elif args.AD_Name in Unsupervise_AD_Pool:
-            output = run_Unsupervise_AD(args.AD_Name, data, **Optimal_Det_HP)
-        else:
-            raise Exception(f"{args.AD_Name} is not defined")
+        try:
+            if args.AD_Name in Semisupervise_AD_Pool:
+                output = run_Semisupervise_AD(data_train=data_train, data_test=data, TS_Name=filename, AD_Name=args.AD_Name, Encoder_Name=args.Encoder_Name, local_running_params=local_running_params, **Optimal_Det_HP)
+            elif args.AD_Name in Unsupervise_AD_Pool:
+                output = run_Unsupervise_AD(args.AD_Name, data, **Optimal_Det_HP)
+            else:
+                raise Exception(f"{args.AD_Name} is not defined")
+        except Exception as e:
+            execution_status.append(f'{filename}: {e}')
 
         end_time = time.time()
         run_time = end_time - start_time
@@ -84,8 +185,8 @@ if __name__ == '__main__':
         ### whether to save the evaluation result
         if args.save:
             try:
-                evaluation_result = get_metrics(output, label, metric='all', slidingWindow=slidingWindow)
-                print('evaluation_result: ', evaluation_result)
+                evaluation_result = get_metrics(output, label, slidingWindow=slidingWindow)
+                #print('evaluation_result: ', evaluation_result)
                 list_w = list(evaluation_result.values())
             except:
                 list_w = [0]*9
@@ -98,4 +199,26 @@ if __name__ == '__main__':
             col_w.insert(0, 'Time')
             col_w.insert(0, 'file')
             w_csv = pd.DataFrame(write_csv, columns=col_w)
-            w_csv.to_csv(f'{args.save_dir}/{args.AD_Name}.csv', index=False)
+            if args.Encoder_Name is None:
+                if args.postfix is not None:
+                    w_csv.to_csv(f'{args.save_dir}/{args.AD_Name}_{id_code:03d}_{args.postfix}.csv', index=False)
+                else:
+                    w_csv.to_csv(f'{args.save_dir}/{args.AD_Name}_{id_code:03d}.csv', index=False)
+            else:
+                if args.postfix is not None:
+                    w_csv.to_csv(f'{args.save_dir}/{args.AD_Name}_{id_code:03d}_{args.Encoder_Name}_{args.postfix}.csv', index=False)
+                else:
+                    w_csv.to_csv(f'{args.save_dir}/{args.AD_Name}_{id_code:03d}_{args.Encoder_Name}.csv', index=False)
+
+    # logging 설정
+    with open(log_file_path, 'a') as f:
+        # run_time 기록
+        f.write('\n')
+        f.write('Total Run Time: {:.3f}s\n'.format(time.time() - Start_T))
+
+        # 실행 성공 여부 기록
+        if len(execution_status) > 0:
+            f.write('\n')
+            f.write('Execution Status:\n')
+            for status in execution_status:
+                f.write(f'{status}\n')

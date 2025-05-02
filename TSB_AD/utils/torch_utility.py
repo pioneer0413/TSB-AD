@@ -6,7 +6,7 @@ import os, math
 
 class EarlyStoppingTorch:
     """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, save_path=None, patience=7, verbose=False, delta=0.0001):
+    def __init__(self, save_path=None, patience=7, verbose=False, delta=0.0001, filename=None):
         """
         Args:
             save_path : 
@@ -25,6 +25,7 @@ class EarlyStoppingTorch:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
+        self.filename = filename
 
     def __call__(self, val_loss, model):
 
@@ -48,7 +49,7 @@ class EarlyStoppingTorch:
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
         if self.save_path:
-            path = os.path.join(self.save_path, 'best_network.pth')
+            path = os.path.join(self.save_path, self.filename)
             torch.save(model.state_dict(), path)	
         self.val_loss_min = val_loss
 

@@ -5,7 +5,7 @@ from .utils.slidingWindows import find_length_rank
 Unsupervise_AD_Pool = ['FFT', 'SR', 'NORMA', 'Series2Graph', 'Sub_IForest', 'IForest', 'LOF', 'Sub_LOF', 'POLY', 'MatrixProfile', 'Sub_PCA', 'PCA', 'HBOS', 
                         'Sub_HBOS', 'KNN', 'Sub_KNN','KMeansAD', 'KMeansAD_U', 'KShapeAD', 'COPOD', 'CBLOF', 'COF', 'EIF', 'RobustPCA', 'Lag_Llama', 'TimesFM', 'Chronos', 'MOMENT_ZS']
 Semisupervise_AD_Pool = ['Left_STAMPi', 'SAND', 'MCD', 'Sub_MCD', 'OCSVM', 'Sub_OCSVM', 'AutoEncoder', 'CNN', 'LSTMAD', 'TranAD', 'USAD', 'OmniAnomaly', 
-                        'AnomalyTransformer', 'TimesNet', 'FITS', 'Donut', 'OFA', 'MOMENT_FT', 'M2N2']
+                        'AnomalyTransformer', 'TimesNet', 'FITS', 'Donut', 'OFA', 'MOMENT_FT', 'M2N2', 'SpikeCNN']
 
 def run_Unsupervise_AD(model_name, data, **kwargs):
     try:
@@ -22,21 +22,88 @@ def run_Unsupervise_AD(model_name, data, **kwargs):
         print(error_message)
         return error_message
 
-
-def run_Semisupervise_AD(model_name, data_train, data_test, **kwargs):
+def run_Semisupervise_AD(data_train=None, data_test=None, # 데이터
+                         TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                         local_running_params=None, # 하이퍼파라미터
+                         **kwargs):
     try:
-        function_name = f'run_{model_name}'
+        function_name = f'run_{AD_Name}'
         function_to_call = globals()[function_name]
-        results = function_to_call(data_train, data_test, **kwargs)
+        results = function_to_call(data_train, data_test, 
+                                   TS_Name=TS_Name, AD_Name=AD_Name, Encoder_Name=Encoder_Name, 
+                                   local_running_params=local_running_params, **kwargs)
         return results
-    except KeyError:
-        error_message = f"Model function '{function_name}' is not defined."
+    except KeyError as e:
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        if tb:
+            last_call = tb[-1]
+            error_message = f"KeyError in {last_call.filename} at line {last_call.lineno}: {str(e)}"
+        else:
+            error_message = f"Model function '{function_name}' is not defined."
         print(error_message)
         return error_message
     except Exception as e:
-        error_message = f"An error occurred while running the model '{function_name}': {str(e)}"
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        if tb:
+            last_call = tb[-1]
+            error_message = f"Error in {last_call.filename} at line {last_call.lineno}: {str(e)}"
+        else:
+            error_message = f"An error occurred while running the model '{function_name}': {str(e)}"
         print(error_message)
         return error_message
+
+def run_CNN(data_train, data_test, # 데이터
+            TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+            window_size=100, num_channel=[32, 40], lr=0.0008, n_jobs=1): # 하이퍼파라미터
+
+    from .models.CNN import CNN
+    clf = CNN(TS_Name=TS_Name, AD_Name=AD_Name, # 메타 데이터
+              batch_size=128,
+              window_size=window_size, num_channel=num_channel, lr=lr,  # 하이퍼파라미터
+              num_raw_features=data_test.shape[1],) 
+
+    try:
+        clf.fit(data_train)
+        score = clf.decision_function(data_test)
+        clf.clean_cuda()
+    except Exception as e:
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        if tb:
+            last_call = tb[-1]
+            print(f'CNN error in {last_call.filename} at line {last_call.lineno}: {e}')
+        else:
+            print(f'CNN error: {e}')
+        return 'CNN error'
+        
+    return score.ravel()
+
+def run_SpikeCNN(data_train, data_test, # 데이터 
+             TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+             local_running_params=None, # 하이퍼파라미터
+             window_size=100, num_channel=[32, 40], num_enc_features=8, lr=0.0008, n_jobs=1): # 하이퍼파라미터
+             
+    from .models.SpikeCNN import SpikeCNN
+    clf = SpikeCNN(TS_Name=TS_Name, AD_Name=AD_Name, Encoder_Name=Encoder_Name, # 메타 데이터
+               num_raw_features=data_test.shape[1], local_running_params=local_running_params)
+
+    try:
+        clf.fit(data_train)
+        score = clf.decision_function(data_test)
+        clf.clean_cuda()
+    except Exception as e:
+        import traceback
+        tb = traceback.extract_tb(e.__traceback__)
+        if tb:
+            last_call = tb[-1]
+            print(f'SpikeCNN error in {last_call.filename} at line {last_call.lineno}: {e}')
+        else:
+            print(f'SpikeCNN error: {e}')
+        return 'SpikeCNN error'
+    
+    return score.ravel()
 
 def run_FFT(data, ifft_parameters=5, local_neighbor_window=21, local_outlier_threshold=0.6, max_region_size=50, max_sign_change_distance=10):
     from .models.FFT import FFT
@@ -275,13 +342,6 @@ def run_AutoEncoder(data_train, data_test, window_size=100, hidden_neurons=[64, 
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_CNN(data_train, data_test, window_size=100, num_channel=[32, 32, 40], lr=0.0008, n_jobs=1):
-    from .models.CNN import CNN
-    clf = CNN(window_size=window_size, num_channel=num_channel, feats=data_test.shape[1], lr=lr, batch_size=128)
-    clf.fit(data_train)
-    score = clf.decision_function(data_test)
-    return score.ravel()
-
 def run_LSTMAD(data_train, data_test, window_size=100, lr=0.0008):
     from .models.LSTMAD import LSTMAD
     clf = LSTMAD(window_size=window_size, pred_len=1, lr=lr, feats=data_test.shape[1], batch_size=128)
@@ -384,23 +444,9 @@ def run_MOMENT_FT(data_train, data_test, win_size=256):
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_M2N2(
-        data_train, data_test, win_size=12, stride=12,
-        batch_size=64, epochs=100, latent_dim=16,
-        lr=1e-3, ttlr=1e-3, normalization='Detrend',
-        gamma=0.99, th=0.9, valid_size=0.2, infer_mode='online'
-    ):
+def run_M2N2(data_train, data_test, epochs=10, win_size=12, lr=1e-3, batch_size=128):
     from .models.M2N2 import M2N2
-    clf = M2N2(
-        win_size=win_size, stride=stride,
-        num_channels=data_test.shape[1],
-        batch_size=batch_size, epochs=epochs,
-        latent_dim=latent_dim,
-        lr=lr, ttlr=ttlr,
-        normalization=normalization,
-        gamma=gamma, th=th, valid_size=valid_size,
-        infer_mode=infer_mode
-    )
+    clf = M2N2(win_size=win_size, num_channels=data_test.shape[1], lr=lr, batch_size=batch_size, epochs=epochs)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
