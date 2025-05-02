@@ -158,14 +158,18 @@ def run_MatrixProfile(data, periodicity=1, n_jobs=1):
     score = clf.decision_scores_
     return score.ravel()
 
-def run_Left_STAMPi(data_train, data):
+def run_Left_STAMPi(data_train, data, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None, # 하이퍼파라미터
+                   ):
     from .models.Left_STAMPi import Left_STAMPi
     clf = Left_STAMPi(n_init_train=len(data_train), window_size=100)
     clf.fit(data)
     score = clf.decision_function(data)
     return score.ravel()
 
-def run_SAND(data_train, data_test, periodicity=1):
+def run_SAND(data_train, data_test, periodicity=1, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None, # 하이퍼파라미터
+                   ):
     from .models.SAND import SAND
     slidingWindow = find_length_rank(data_test, rank=periodicity)
     clf = SAND(pattern_length=slidingWindow, subsequence_length=4*(slidingWindow))
@@ -237,7 +241,8 @@ def run_HBOS(data, slidingWindow=1, n_bins=10, tol=0.5, n_jobs=1):
     score = clf.decision_scores_
     return score.ravel()
 
-def run_Sub_OCSVM(data_train, data_test, kernel='rbf', nu=0.5, periodicity=1, n_jobs=1):
+def run_Sub_OCSVM(data_train, data_test, kernel='rbf', nu=0.5, periodicity=1, n_jobs=1, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.OCSVM import OCSVM
     slidingWindow = find_length_rank(data_test, rank=periodicity)
     clf = OCSVM(slidingWindow=slidingWindow, kernel=kernel, nu=nu)
@@ -245,14 +250,16 @@ def run_Sub_OCSVM(data_train, data_test, kernel='rbf', nu=0.5, periodicity=1, n_
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_OCSVM(data_train, data_test, kernel='rbf', nu=0.5, slidingWindow=1, n_jobs=1):
+def run_OCSVM(data_train, data_test, kernel='rbf', nu=0.5, slidingWindow=1, n_jobs=1, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.OCSVM import OCSVM
     clf = OCSVM(slidingWindow=slidingWindow, kernel=kernel, nu=nu)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_Sub_MCD(data_train, data_test, support_fraction=None, periodicity=1, n_jobs=1):
+def run_Sub_MCD(data_train, data_test, support_fraction=None, periodicity=1, n_jobs=1, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.MCD import MCD
     slidingWindow = find_length_rank(data_test, rank=periodicity)
     clf = MCD(slidingWindow=slidingWindow, support_fraction=support_fraction)
@@ -260,7 +267,8 @@ def run_Sub_MCD(data_train, data_test, support_fraction=None, periodicity=1, n_j
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_MCD(data_train, data_test, support_fraction=None, slidingWindow=1, n_jobs=1):
+def run_MCD(data_train, data_test, support_fraction=None, slidingWindow=1, n_jobs=1, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터
     from .models.MCD import MCD
     clf = MCD(slidingWindow=slidingWindow, support_fraction=support_fraction)
     clf.fit(data_train)
@@ -335,70 +343,80 @@ def run_SR(data, periodicity=1):
     slidingWindow = find_length_rank(data, rank=periodicity)
     return SR(data, window_size=slidingWindow)
 
-def run_AutoEncoder(data_train, data_test, window_size=100, hidden_neurons=[64, 32], n_jobs=1):
+def run_AutoEncoder(data_train, data_test, window_size=100, hidden_neurons=[64, 32], n_jobs=1, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.AE import AutoEncoder
     clf = AutoEncoder(slidingWindow=window_size, hidden_neurons=hidden_neurons, batch_size=128, epochs=50)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_LSTMAD(data_train, data_test, window_size=100, lr=0.0008):
+def run_LSTMAD(data_train, data_test, window_size=100, lr=0.0008, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.LSTMAD import LSTMAD
     clf = LSTMAD(window_size=window_size, pred_len=1, lr=lr, feats=data_test.shape[1], batch_size=128)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_TranAD(data_train, data_test, win_size=10, lr=1e-3):
+def run_TranAD(data_train, data_test, win_size=10, lr=1e-3, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.TranAD import TranAD
     clf = TranAD(win_size=win_size, feats=data_test.shape[1], lr=lr)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_AnomalyTransformer(data_train, data_test, win_size=100, lr=1e-4, batch_size=128):
+def run_AnomalyTransformer(data_train, data_test, win_size=100, lr=1e-4, batch_size=128, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.AnomalyTransformer import AnomalyTransformer
     clf = AnomalyTransformer(win_size=win_size, input_c=data_test.shape[1], lr=lr, batch_size=batch_size)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_OmniAnomaly(data_train, data_test, win_size=100, lr=0.002):
+def run_OmniAnomaly(data_train, data_test, win_size=100, lr=0.002, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.OmniAnomaly import OmniAnomaly
     clf = OmniAnomaly(win_size=win_size, feats=data_test.shape[1], lr=lr)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_USAD(data_train, data_test, win_size=5, lr=1e-4):
+def run_USAD(data_train, data_test, win_size=5, lr=1e-4, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.USAD import USAD
     clf = USAD(win_size=win_size, feats=data_test.shape[1], lr=lr)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_Donut(data_train, data_test, win_size=120, lr=1e-4, batch_size=128):
+def run_Donut(data_train, data_test, win_size=120, lr=1e-4, batch_size=128, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.Donut import Donut
     clf = Donut(win_size=win_size, input_c=data_test.shape[1], lr=lr, batch_size=batch_size)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_TimesNet(data_train, data_test, win_size=96, lr=1e-4):
+def run_TimesNet(data_train, data_test, win_size=96, lr=1e-4, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.TimesNet import TimesNet
     clf = TimesNet(win_size=win_size, enc_in=data_test.shape[1], lr=lr, epochs=50)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_FITS(data_train, data_test, win_size=100, lr=1e-3):
+def run_FITS(data_train, data_test, win_size=100, lr=1e-3, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.FITS import FITS
     clf = FITS(win_size=win_size, input_c=data_test.shape[1], lr=lr, batch_size=128)
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_OFA(data_train, data_test, win_size=100, batch_size = 64):
+def run_OFA(data_train, data_test, win_size=100, batch_size = 64, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.OFA import OFA
     clf = OFA(win_size=win_size, enc_in=data_test.shape[1], epochs=10, batch_size=batch_size)
     clf.fit(data_train)
@@ -435,7 +453,8 @@ def run_MOMENT_ZS(data, win_size=256):
     score = clf.decision_scores_
     return score.ravel()
 
-def run_MOMENT_FT(data_train, data_test, win_size=256):
+def run_MOMENT_FT(data_train, data_test, win_size=256, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.MOMENT import MOMENT
     clf = MOMENT(win_size=win_size, input_c=data_test.shape[1])
 
@@ -444,7 +463,8 @@ def run_MOMENT_FT(data_train, data_test, win_size=256):
     score = clf.decision_function(data_test)
     return score.ravel()
 
-def run_M2N2(data_train, data_test, epochs=10, win_size=12, lr=1e-3, batch_size=128):
+def run_M2N2(data_train, data_test, epochs=10, win_size=12, lr=1e-3, batch_size=128, TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+                   local_running_params=None): # 하이퍼파라미터):
     from .models.M2N2 import M2N2
     clf = M2N2(win_size=win_size, num_channels=data_test.shape[1], lr=lr, batch_size=batch_size, epochs=epochs)
     clf.fit(data_train)
