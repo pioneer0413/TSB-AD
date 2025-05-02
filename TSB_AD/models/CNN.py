@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader
 
 from . import Base
 from ..utils.utility import get_activation_by_name
-from ..utils.torch_utility import EarlyStoppingTorch, get_gpu
 from ..utils.dataset import ForecastDataset
 from ..snn.utils import loss_visualization
 from ..snn.params import running_params
@@ -107,8 +106,6 @@ class CNN(Base.BaseModule):
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.75)
         self.loss = nn.MSELoss()
-        self.save_path = f'/home/hwkang/TSB-AD/weights/'
-        self.early_stopping = EarlyStoppingTorch(save_path=self.save_path, patience=3, filename=f'{self.AD_Name}_{TS_Name}.pt')
         
         self.mu = None
         self.sigma = None
@@ -200,7 +197,7 @@ class CNN(Base.BaseModule):
             
             self.early_stopping(valid_loss, self.model)
             if self.early_stopping.early_stop or epoch == self.epochs - 1:
-                loss_visualization(train_loss_rec, valid_loss_rec, TS_Name=self.TS_Name, AD_Name='CNN', Encoder_Name=None)
+                #loss_visualization(train_loss_rec, valid_loss_rec, TS_Name=self.TS_Name, AD_Name='CNN', Encoder_Name=None)
                 # fitting Gaussian Distribution
                 if len(scores) > 0:
                     scores = torch.cat(scores, dim=0)

@@ -1,11 +1,15 @@
 import torchinfo
 import numpy as np
-from ..utils.torch_utility import get_gpu
+from ..utils.torch_utility import EarlyStoppingTorch, get_gpu
+import os
 
 class BaseModule():
     def __init__(self,
                  TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
-                 num_raw_features=-1,
+                 batch_size=128, epochs=50, validation_size=0.2, # 훈련 루프 하이퍼파라미터
+                 window_size=100, num_channel=[32, 40], lr=0.0008, # 학습 하이퍼파라미터
+                 num_raw_features=1,
+                 pred_len=1,
                  local_running_params=None): # 미지정 하이퍼파라미터
 
         self.local_running_params = local_running_params
@@ -23,21 +27,28 @@ class BaseModule():
         self.AD_Name = AD_Name
         self.Encoder_Name = Encoder_Name
 
-        # 훈련 루프 하이퍼파라미터
-        self.batch_size = self.local_running_params['batch_size']
-        self.epochs = self.local_running_params['epochs']
-        self.validation_size = self.local_running_params['validation_size']
+        if self.AD_Name == 'SpikeCNN':
+            # 훈련 루프 하이퍼파라미터
+            self.batch_size = self.local_running_params['batch_size']
+            self.epochs = self.local_running_params['epochs']
+            self.validation_size = self.local_running_params['validation_size']
+            self.window_size = self.local_running_params['window_size'] # 학습 하이퍼파라미터
+            self.num_raw_features = num_raw_features # Features 지정 하이퍼파라미터
+            self.pred_len = self.local_running_params['predict_time_steps'] # 미지정 하이퍼파라미터
+        else:
+            self.batch_size = batch_size
+            self.epochs = epochs
+            self.validation_size = validation_size
+            self.window_size = window_size
+            self.num_channel = num_channel
+            self.lr = lr
+            self.num_raw_features = num_raw_features
+            self.pred_len = pred_len
 
-        # 학습 하이퍼파라미터
-        self.window_size = self.local_running_params['window_size']
-
-        # Features 지정 하이퍼파라미터
-        self.num_raw_features = num_raw_features
-
-        #self.lr = self.local_running_params['SpikeCNN']['lr']
-
-        # 미지정 하이퍼파라미터
-        self.pred_len = self.local_running_params['predict_time_steps']
+        self.root_dir_path = '/home/hwkang/dev-TSB-AD/TSB-AD/'
+        self.save_path = os.path.join(self.root_dir_path, 'weights')
+        os.makedirs(self.save_path, exist_ok=True)
+        self.early_stopping = EarlyStoppingTorch(save_path=self.save_path, patience=3, filename=f'{self.AD_Name}_{TS_Name}.pt')
 
     def fit(self, data):
         raise NotImplementedError("fit method not implemented")

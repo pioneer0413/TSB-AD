@@ -56,6 +56,7 @@ def run_Semisupervise_AD(data_train=None, data_test=None, # 데이터
 
 def run_CNN(data_train, data_test, # 데이터
             TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
+            local_running_params=None, # 하이퍼파라미터
             window_size=100, num_channel=[32, 40], lr=0.0008, n_jobs=1): # 하이퍼파라미터
 
     from .models.CNN import CNN

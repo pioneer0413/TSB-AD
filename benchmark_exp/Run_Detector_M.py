@@ -26,17 +26,19 @@ torch.backends.cudnn.deterministic = True
 print("CUDA available: ", torch.cuda.is_available())
 print("cuDNN version: ", torch.backends.cudnn.version())
 
+root_dir_path = '/home/hwkang/dev-TSB-AD/TSB-AD/'
+
 if __name__ == '__main__':
 
     Start_T = time.time()
     ## ArgumentParser
     parser = argparse.ArgumentParser(description='Generating Anomaly Score')
-    parser.add_argument('--dataset_dir', type=str, default='/home/hwkang/TSB-AD/Datasets/TSB-AD-M')
-    parser.add_argument('--file_list', type=str, default='/home/hwkang/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv')
-    parser.add_argument('--score_dir', type=str, default='/home/hwkang/TSB-AD/eval/score/multi/')
-    parser.add_argument('--save_dir', type=str, default='/home/hwkang/TSB-AD/eval/metrics/multi/')
+    parser.add_argument('--dataset_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/TSB-AD-M')
+    parser.add_argument('--file_list', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv')
+    parser.add_argument('--score_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/eval/score/multi/')
+    parser.add_argument('--save_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/eval/metrics/multi/')
     parser.add_argument('--save', action='store_true', default=False)
-    parser.add_argument('--AD_Name', type=str, default='SpikeCNN')
+    parser.add_argument('--AD_Name', type=str, default='SpikeCNN', required=True)
     parser.add_argument('--Encoder_Name', type=str, default=None)
     parser.add_argument('--postfix', type=str, default=None)
     parser.add_argument('--overwrite', action='store_true', default=False) # False=skip, True=overwrite
@@ -93,7 +95,7 @@ if __name__ == '__main__':
     time.sleep(random_num)
     random.seed(seed)
 
-    log_dir_path = '/home/hwkang/TSB-AD/logs'
+    log_dir_path = os.path.join(root_dir_path, 'logs')
     os.makedirs(log_dir_path, exist_ok=True)
     # log_dir_path의 파일 리스트 가져오기
     log_files = os.listdir(log_dir_path)
@@ -199,6 +201,7 @@ if __name__ == '__main__':
             col_w.insert(0, 'Time')
             col_w.insert(0, 'file')
             w_csv = pd.DataFrame(write_csv, columns=col_w)
+            os.makedirs(args.save_dir, exist_ok=True)
             if args.Encoder_Name is None:
                 if args.postfix is not None:
                     w_csv.to_csv(f'{args.save_dir}/{args.AD_Name}_{id_code:03d}_{args.postfix}.csv', index=False)

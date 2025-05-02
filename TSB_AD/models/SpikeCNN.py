@@ -147,8 +147,6 @@ class SpikeCNN(Base.BaseModule):
             self.loss = nn.MSELoss()
         else:
             pass
-        self.save_path = f'/home/hwkang/TSB-AD/weights/'
-        self.early_stopping = EarlyStoppingTorch(save_path=self.save_path, patience=3, filename=f'{self.AD_Name}_{self.Encoder_Name}_{TS_Name}.pt')
 
     def fit(self, data):
         tsTrain = data[:int((1-self.validation_size)*len(data))]
