@@ -63,10 +63,12 @@ def run_CNN(data_train, data_test, # 데이터
     clf = CNN(TS_Name=TS_Name, AD_Name=AD_Name, # 메타 데이터
               batch_size=128,
               window_size=window_size, num_channel=num_channel, lr=lr,  # 하이퍼파라미터
-              num_raw_features=data_test.shape[1],) 
+              num_raw_features=data_test.shape[1],
+              local_running_params=local_running_params) 
 
     try:
-        clf.fit(data_train)
+        if local_running_params['load'] == False:
+            clf.fit(data_train)
         score = clf.decision_function(data_test)
         clf.clean_cuda()
     except Exception as e:
@@ -91,7 +93,8 @@ def run_SpikeCNN(data_train, data_test, # 데이터
                num_raw_features=data_test.shape[1], local_running_params=local_running_params)
 
     try:
-        clf.fit(data_train)
+        if local_running_params['load'] == False:
+            clf.fit(data_train)
         score = clf.decision_function(data_test)
         clf.clean_cuda()
     except Exception as e:
@@ -99,10 +102,11 @@ def run_SpikeCNN(data_train, data_test, # 데이터
         tb = traceback.extract_tb(e.__traceback__)
         if tb:
             last_call = tb[-1]
-            print(f'SpikeCNN error in {last_call.filename} at line {last_call.lineno}: {e}')
+            #print(f'SpikeCNN error in {last_call.filename} at line {last_call.lineno}: {e}')
         else:
-            print(f'SpikeCNN error: {e}')
-        return 'SpikeCNN error'
+            pass
+            #print(f'SpikeCNN error: {e}')
+        raise Exception(f'SpikeCNN error: {e}')
     
     return score.ravel()
 

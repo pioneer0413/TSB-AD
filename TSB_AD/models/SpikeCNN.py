@@ -11,7 +11,7 @@ from . import Base
 from ..utils.torch_utility import EarlyStoppingTorch
 from ..utils.dataset import ForecastDataset
 from ..snn.encoders import PoissonEncoder, DeltaEncoder, ConvEncoder, RepeatEncoder
-from ..snn.activations import SpikeActivation
+from ..snn.activations import SpikeActivation, TernarySpikeActivation
 from snntorch import utils
 
 class AdaptiveConcatPool1d(nn.Module):
@@ -36,6 +36,8 @@ class SpikeCNNModel(nn.Module):
 
         self.device = device
 
+        self.local_running_params = local_running_params
+
         # save the default values
         self.num_channel = local_running_params['SpikeCNNModel']['num_channel']
         self.num_raw_features = num_raw_features # 원본 시계열 데이터의 채널 수
@@ -46,7 +48,6 @@ class SpikeCNNModel(nn.Module):
         self.stride = local_running_params['SpikeCNNModel']['stride']
         self.predict_time_steps = predict_time_steps
         self.dropout_rate = local_running_params['SpikeCNNModel']['dropout_rate']
-        self.learn_threshold = local_running_params['SpikeCNNModel']['learn_threshold']
 
         # 인코더 지정
         self.Encoder_Name = Encoder_Name
@@ -66,14 +67,20 @@ class SpikeCNNModel(nn.Module):
         self.conv_layers = nn.Sequential()
         prev_channels = self.num_in_features
 
+        output_length = [48, 22,] # Adjust mannually!
+
         for idx, out_channels in enumerate(self.num_channel):
             self.conv_layers.add_module("conv" + str(idx),
                                         torch.nn.Conv1d(prev_channels,
                                                         self.num_channel[idx],
                                                         self.kernel_size,
                                                         self.stride))
-            #self.conv_layers.add_module(self.hidden_activation + str(idx), self.activation)
-            self.conv_layers.add_module("lif" + str(idx), SpikeActivation())
+            if self.local_running_params['activations']['activation'] == 'binary':
+                self.conv_layers.add_module("lif" + str(idx), SpikeActivation(local_running_params, self.num_channel[idx]))
+            elif self.local_running_params['activations']['activation'] == 'ternary':
+                self.conv_layers.add_module("lif" + str(idx), TernarySpikeActivation(local_running_params))
+            else:
+                raise ValueError(f"Activation: {self.local_running_params['activations']['activation']} is not supported.")
             self.conv_layers.add_module("pool" + str(idx), nn.MaxPool1d(kernel_size=2))
             prev_channels = out_channels
 
@@ -84,14 +91,15 @@ class SpikeCNNModel(nn.Module):
                                 torch.nn.Dropout(self.dropout_rate),
                                 torch.nn.Linear(self.num_channel[-1], self.num_out_features))
 
-    def forward(self, x, save_encoding=False):
+    def forward(self, x_raw, save_encoding=False):
         utils.reset(self.encoder)
-        x = self.encoder(x) # (batch, num_enc_features, num_raw_features, length)
+        x = self.encoder(x_raw) # (batch, num_enc_features, num_raw_features, length) <- [B, C, L]
+        x_copy= x.clone()
 
         if x.ndim == 4:
             x = x.permute(0, 2, 1, 3).contiguous()
             x = x.view(x.shape[0], -1, x.shape[3]) # [B, E*C, L] <- [B, E, C, L]
-        
+
         # For each layer with a name starting with "lif", call utils.reset on its instance
         for name, module in self.conv_layers.named_children():
             if name.startswith("lif"):
@@ -105,7 +113,7 @@ class SpikeCNNModel(nn.Module):
             outputs[t] = torch.squeeze(decoder_input, dim=-2)
 
         if save_encoding:
-            return outputs, None
+            return outputs, (x_copy, x_raw)
         else:
             return outputs # (steps, batch, num_out_features)
     
@@ -135,6 +143,11 @@ class SpikeCNN(Base.BaseModule):
                                predict_time_steps=self.pred_len,
                                Encoder_Name=self.Encoder_Name,
                                local_running_params=local_running_params).to(self.device)
+        
+        if self.local_running_params['load']:
+            self.model.load_state_dict(torch.load(self.local_running_params['load_file_path']))
+            print(f"Model loaded from {self.local_running_params['load_file_path']}")
+
         if self.optimizer_type == 'adam':
             self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         else:
@@ -172,7 +185,8 @@ class SpikeCNN(Base.BaseModule):
                                   batch_size=self.batch_size,
                                   shuffle=False)
 
-        encoding_results = []
+        encoding_results_x_enc = []
+        encoding_results_x_raw = []
         threshold_traces = []
         for epoch in range(1, self.epochs + 1):
             self.model.train(mode=True)
@@ -183,14 +197,6 @@ class SpikeCNN(Base.BaseModule):
 
                 self.optimizer.zero_grad()
 
-                '''
-                if idx == 0:
-                    output, x_copy = self.model(x, save_encoding=self.save_encoding)
-                    encoding_results.append(x_copy) # (B, E, C, L) * Epoch <-
-                else:
-                    output = self.model(x)
-                '''
-                
                 output = self.model(x)
                 '''
                 if self.trace_threshold:
@@ -220,7 +226,36 @@ class SpikeCNN(Base.BaseModule):
                 for idx, (x, target) in loop:
                     x, target = x.to(self.device), target.to(self.device)
 
-                    output = self.model(x)
+                    if self.save_encoding:
+                        # if it's first epoch and it's first batch, then save encodings into the list
+                        # and if it's the last epoch and it's first batch, then save encodings into the list
+                        output, (x, x_raw) = self.model(x, save_encoding=True)
+                        if idx == 0:
+                            x = x.detach().cpu()
+                            x_raw = x_raw.detach().cpu()
+                            x_raw = x_raw.permute(0, 2, 1).unsqueeze(1)
+                            print(x.shape, x_raw.shape)
+                            # Expand x_raw to match the shape of x
+                            x_raw = x_raw.expand(x.shape[0], x.shape[1], x.shape[2], x.shape[3])
+                            encoding_results_x_enc.append(x)
+                            encoding_results_x_raw.append(x_raw)
+                            if epoch == self.epochs: # last epoch, save encodings
+                                save_encoding_dir_path = '/home/hwkang/dev-TSB-AD/TSB-AD/eval/encodings'
+                                seve_encoding_file_name_x_enc = f'{self.Encoder_Name}_{self.TS_Name}_{self.local_running_params["postfix"]}_enc.npy'
+                                seve_encoding_file_name_x_raw = f'{self.Encoder_Name}_{self.TS_Name}_{self.local_running_params["postfix"]}_raw.npy'
+
+                                print(len(encoding_results_x_enc), len(encoding_results_x_raw))
+                                print(encoding_results_x_enc[0].shape, encoding_results_x_raw[0].shape)
+                                print(type(encoding_results_x_enc[0]), type(encoding_results_x_raw[0]))
+                                print(type(encoding_results_x_enc), type(encoding_results_x_raw))
+                                # Convert encoding_results to numpy array
+                                encoding_results_x_enc = torch.stack(encoding_results_x_enc, dim=0) # (Ep, B, E, C, L) <-
+                                encoding_results_x_raw = torch.stack(encoding_results_x_raw, dim=0) # (Ep, B, E, C, L) <-
+                                # Save the encoding results
+                                np.save(os.path.join(save_encoding_dir_path, seve_encoding_file_name_x_enc), encoding_results_x_enc.numpy())
+                                np.save(os.path.join(save_encoding_dir_path, seve_encoding_file_name_x_raw), encoding_results_x_raw.numpy())
+                    else:
+                        output = self.model(x)
                     
                     output = output.view(-1, self.num_raw_features*self.pred_len)
                     target = target.view(-1, self.num_raw_features*self.pred_len)
@@ -251,71 +286,3 @@ class SpikeCNN(Base.BaseModule):
                         #print("   Early stopping<<<")
                         pass
                     break
-
-        '''
-        if self.save_encoding:
-            save_dir_path = '/home/hwkang/TSB-AD/TSB_AD/snn/tests/encoding'
-            # encoding_results를 numpy로 변환
-            x_copy = torch.stack(encoding_results, dim=0) # (Epochs, B, E, C, L)
-            x_numpy = x_copy.detach().cpu().numpy()
-            file_name = f'{self.Encoder_Name}_{self.encoding_threshold}_{self.learn_threshold}_{self.TS_Name}'
-            save_file_path = os.path.join(save_dir_path, f'{file_name}.npy')
-            np.save(save_file_path, x_numpy)
-
-        if self.trace_threshold:
-            save_dir_path = '/home/hwkang/TSB-AD/TSB_AD/snn/tests/threshold'
-            x_copy = torch.stack(threshold_traces, dim=0) # (Epochs)
-            x_numpy = x_copy.numpy()
-            file_name = f'{self.Encoder_Name}_{self.encoding_threshold}_{self.learn_threshold}_{self.TS_Name}'
-            save_file_path = os.path.join(save_dir_path, f'{file_name}.npy')
-            np.save(save_file_path, x_numpy)
-        '''
-        
-    def decision_function(self, data):
-        test_loader = DataLoader(
-            ForecastDataset(data, window_size=self.window_size, pred_len=self.pred_len),
-            batch_size=self.batch_size,
-            shuffle=False
-        )
-        
-        self.model.eval()
-        scores = []
-        y_hats = []
-        loop = tqdm.tqdm(enumerate(test_loader),total=len(test_loader),leave=True)
-
-        with torch.no_grad():
-            for idx, (x, target) in loop:
-                x, target = x.to(self.device), target.to(self.device)
-                
-                output = self.model(x)
-                
-                output = output.view(-1, self.num_raw_features*self.pred_len)
-                target = target.view(-1, self.num_raw_features*self.pred_len)
-
-                mse = torch.sub(output, target).pow(2)
-
-                y_hats.append(output.cpu())
-                scores.append(mse.cpu())
-                loop.set_description(f'Testing: ')
-
-        scores = torch.cat(scores, dim=0)
-        
-        scores = scores.numpy()
-        scores = np.mean(scores, axis=1)
-        
-        y_hats = torch.cat(y_hats, dim=0)
-        y_hats = y_hats.numpy()
-        
-        l, w = y_hats.shape
-
-        assert scores.ndim == 1
-        
-        if self.local_running_params['verbose']:
-            print('scores: ', scores.shape) 
-        if scores.shape[0] < len(data):
-            padded_decision_scores_ = np.zeros(len(data))
-            padded_decision_scores_[: self.window_size+self.pred_len-1] = scores[0]
-            padded_decision_scores_[self.window_size+self.pred_len-1 : ] = scores
-
-        self.__anomaly_score = padded_decision_scores_
-        return padded_decision_scores_

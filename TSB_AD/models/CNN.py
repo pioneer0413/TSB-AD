@@ -91,17 +91,23 @@ class CNN(Base.BaseModule):
                  batch_size=128, epochs=50, validation_size=0.2, # 훈련 루프 하이퍼파라미터
                  window_size=100, num_channel=[32, 40], lr=0.0008, # 학습 하이퍼파라미터
                  num_raw_features=1,
-                 pred_len=1): # 미지정 하이퍼파라미터
+                 pred_len=1,
+                 local_running_params=None): # 미지정 하이퍼파라미터
                  
         super().__init__(TS_Name=TS_Name, AD_Name=AD_Name, Encoder_Name=Encoder_Name,
                          batch_size=batch_size, epochs=epochs, validation_size=validation_size,
                          window_size=window_size, num_channel=num_channel, lr=lr,
-                         num_raw_features=num_raw_features, pred_len=pred_len)
+                         num_raw_features=num_raw_features, pred_len=pred_len,
+                         local_running_params=local_running_params)
   
         self.model = CNNModel(device=self.device,
                               num_channel=self.num_channel,
                               num_in_features=self.num_raw_features, 
                               predict_time_steps=self.pred_len).to(self.device)
+        
+        if self.local_running_params['load']:
+            self.model.load_state_dict(torch.load(self.local_running_params['load_file_path']))
+            print(f"Model loaded from {self.local_running_params['load_file_path']}")
 
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.75)
@@ -195,75 +201,19 @@ class CNN(Base.BaseModule):
             valid_loss = avg_loss/max(len(valid_loader), 1)
             self.scheduler.step()
             
-            self.early_stopping(valid_loss, self.model)
-            if self.early_stopping.early_stop or epoch == self.epochs - 1:
-                #loss_visualization(train_loss_rec, valid_loss_rec, TS_Name=self.TS_Name, AD_Name='CNN', Encoder_Name=None)
-                # fitting Gaussian Distribution
-                if len(scores) > 0:
-                    scores = torch.cat(scores, dim=0)
-                    self.mu = torch.mean(scores)
-                    self.sigma = torch.var(scores)
-                    print(self.mu.size(), self.sigma.size())
-                if self.early_stopping.early_stop:
-                    print("   Early stopping<<<")
+            try:
+                self.early_stopping(valid_loss, self.model)
+                if self.early_stopping.early_stop or epoch == self.epochs - 1:
+                    #loss_visualization(train_loss_rec, valid_loss_rec, TS_Name=self.TS_Name, AD_Name='CNN', Encoder_Name=None)
+                    # fitting Gaussian Distribution
+                    if len(scores) > 0:
+                        scores = torch.cat(scores, dim=0)
+                        self.mu = torch.mean(scores)
+                        self.sigma = torch.var(scores)
+                        print(self.mu.size(), self.sigma.size())
+                    if self.early_stopping.early_stop:
+                        print("   Early stopping<<<")
+                    break
+            except Exception as e:
+                print(f"Early stopping failed: {e}")
                 break
-
-    def decision_function(self, data):
-        test_loader = DataLoader(
-            ForecastDataset(data, window_size=self.window_size, pred_len=self.pred_len),
-            batch_size=self.batch_size,
-            shuffle=False
-        )
-        
-        self.model.eval()
-        scores = []
-        y_hats = []
-        loop = tqdm.tqdm(enumerate(test_loader),total=len(test_loader),leave=True)
-        with torch.no_grad():
-            for idx, (x, target) in loop:
-                x, target = x.to(self.device), target.to(self.device)
-                output = self.model(x)
-                
-                output = output.view(-1, self.num_raw_features*self.pred_len)
-                target = target.view(-1, self.num_raw_features*self.pred_len)
-
-                mse = torch.sub(output, target).pow(2)
-
-                y_hats.append(output.cpu())
-                scores.append(mse.cpu())
-                loop.set_description(f'Testing: ')
-
-        scores = torch.cat(scores, dim=0)
-        # scores = 0.5 * (torch.log(self.sigma + self.eps) + (scores - self.mu)**2 / (self.sigma+self.eps))
-        
-        scores = scores.numpy()
-        scores = np.mean(scores, axis=1)
-        
-        y_hats = torch.cat(y_hats, dim=0)
-        y_hats = y_hats.numpy()
-        
-        l, w = y_hats.shape
-        
-        # new_scores = np.zeros((l - self.pred_len, w))
-        # for i in range(w):
-        #     new_scores[:, i] = scores[self.pred_len - i:l-i, i]
-        # scores = np.mean(new_scores, axis=1)
-        # scores = np.pad(scores, (0, self.pred_len - 1), 'constant', constant_values=(0,0))
-        
-        # new_y_hats = np.zeros((l - self.pred_len, w))
-        # for i in range(w):
-        #     new_y_hats[:, i] = y_hats[self.pred_len - i:l-i, i]
-        # y_hats = np.mean(new_y_hats, axis=1)
-        # y_hats = np.pad(y_hats, (0, self.pred_len - 1), 'constant',constant_values=(0,0))
-
-        assert scores.ndim == 1
-        # self.y_hats = y_hats
-        
-        print('scores: ', scores.shape)
-        if scores.shape[0] < len(data):
-            padded_decision_scores_ = np.zeros(len(data))
-            padded_decision_scores_[: self.window_size+self.pred_len-1] = scores[0]
-            padded_decision_scores_[self.window_size+self.pred_len-1 : ] = scores
-
-        self.__anomaly_score = padded_decision_scores_
-        return padded_decision_scores_

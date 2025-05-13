@@ -2,6 +2,12 @@ import torchinfo
 import numpy as np
 from ..utils.torch_utility import EarlyStoppingTorch, get_gpu
 import os
+from torch.utils.data import DataLoader
+from ..utils.dataset import ForecastDataset
+import tqdm
+import torch
+from cleverhans.torch.attacks.fast_gradient_method import fast_gradient_method
+from cleverhans.torch.attacks.projected_gradient_descent import projected_gradient_descent
 
 class BaseModule():
     def __init__(self,
@@ -20,7 +26,7 @@ class BaseModule():
         # GPU/CPU 설정
         cuda = True
         self.cuda = cuda
-        self.device = get_gpu(self.cuda)
+        self.device = get_gpu(self.cuda) if local_running_params['off_cuda'] == False else torch.device('cpu')
 
         # 메타 데이터
         self.TS_Name = TS_Name
@@ -45,16 +51,70 @@ class BaseModule():
             self.num_raw_features = num_raw_features
             self.pred_len = pred_len
 
+        # 적대적 공격
+        self.adversarial = self.local_running_params['adversarial']
+        
         self.root_dir_path = '/home/hwkang/dev-TSB-AD/TSB-AD/'
         self.save_path = os.path.join(self.root_dir_path, 'weights')
         os.makedirs(self.save_path, exist_ok=True)
-        self.early_stopping = EarlyStoppingTorch(save_path=self.save_path, patience=3, filename=f'{self.AD_Name}_{TS_Name}.pt')
+        self.early_stopping = EarlyStoppingTorch(save_path=self.save_path, patience=3, filename=local_running_params['save_file_path'])
 
     def fit(self, data):
         raise NotImplementedError("fit method not implemented")
 
     def decision_function(self, data):
-        raise NotImplementedError("decision_function method not implemented")
+        test_loader = DataLoader(
+            ForecastDataset(data, window_size=self.window_size, pred_len=self.pred_len),
+            batch_size=self.batch_size,
+            shuffle=False
+        )
+        
+        self.model.eval()
+        scores = []
+        y_hats = []
+        loop = tqdm.tqdm(enumerate(test_loader),total=len(test_loader),leave=True)
+        with torch.no_grad():
+            for idx, (x, target) in loop:
+                x, target = x.to(self.device), target.to(self.device)
+
+                with torch.enable_grad():
+                    if self.adversarial['type'] == 'fgsm':
+                        x = fast_gradient_method(self.model, x, self.adversarial['fgsm']['eps'], self.adversarial['fgsm']['norm'])
+                    elif self.adversarial['type'] == 'pgd':
+                        x = projected_gradient_descent(self.model, x, self.adversarial['pgd']['eps'], self.adversarial['pgd']['eps_iter'], self.adversarial['pgd']['nb_iter'], self.adversarial['pgd']['norm'])
+
+                output = self.model(x)
+                
+                output = output.view(-1, self.num_raw_features*self.pred_len)
+                target = target.view(-1, self.num_raw_features*self.pred_len)
+                
+                mse = torch.sub(output, target).pow(2)
+
+                y_hats.append(output.cpu())
+                scores.append(mse.cpu())
+                loop.set_description(f'Testing: ')
+
+        scores = torch.cat(scores, dim=0)
+        
+        scores = scores.numpy()
+        scores = np.mean(scores, axis=1)
+        
+        y_hats = torch.cat(y_hats, dim=0)
+        y_hats = y_hats.numpy()
+        
+        l, w = y_hats.shape
+
+        assert scores.ndim == 1
+        
+        if self.local_running_params['verbose']:
+            print('scores: ', scores.shape) 
+        if scores.shape[0] < len(data):
+            padded_decision_scores_ = np.zeros(len(data))
+            padded_decision_scores_[: self.window_size+self.pred_len-1] = scores[0]
+            padded_decision_scores_[self.window_size+self.pred_len-1 : ] = scores
+
+        self.__anomaly_score = padded_decision_scores_
+        return padded_decision_scores_
 
     def anomaly_score(self) -> np.ndarray:
         return self.__anomaly_score

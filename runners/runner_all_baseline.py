@@ -3,8 +3,8 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-param_set = param_sets.param_set9
-SCRIPT_PATH = '/home/hwkang/TSB-AD/benchmark_exp/Run_Detector_M.py'
+param_set = param_sets.param_set_AB
+SCRIPT_PATH = '/home/hwkang/dev-TSB-AD/TSB-AD/benchmark_exp/Run_Detector_M.py'
 
 def run_script(args_list):
     print(f"\n[Running] Args: {args_list}")

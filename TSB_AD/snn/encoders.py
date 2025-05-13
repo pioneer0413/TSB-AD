@@ -2,78 +2,48 @@ import torch
 import torch.nn as nn
 import snntorch as snn
 from snntorch import surrogate
+from snntorch import spikegen
 import math
 
+from TSB_AD.snn.activations import SpikeActivation, TernarySpikeActivation
+
 class BaseEncoder(nn.Module):
-    def __init__(self, num_raw_features: int, window_size: int = 50, local_running_params=None):
+    def __init__(self, local_running_params, num_raw_features):
         super().__init__()
 
+        assert local_running_params is not None, "local_running_params cannot be None."
         self.local_running_params = local_running_params
 
         self.num_raw_features = num_raw_features
         self.num_enc_features = self.local_running_params['num_enc_features']
-        self.learn_threshold = self.local_running_params['encoders']['learn_threshold']
-        self.window_size = window_size
+        self.window_size = self.local_running_params['window_size']
 
-        if self.local_running_params['encoders']['normalization_layer']['type'] == 'bn':
+        if self.local_running_params['encoders']['common']['normalization_layer']['type'] == 'bn':
             self.norm = nn.BatchNorm2d(self.num_enc_features)
-        elif self.local_running_params['encoders']['normalization_layer']['type'] == 'ln':
+        elif self.local_running_params['encoders']['common']['normalization_layer']['type'] == 'ln':
             E, C, L = self.num_enc_features, self.num_raw_features, self.window_size
             self.norm = nn.LayerNorm((E, C, L))
-        elif self.local_running_params['encoders']['normalization_layer']['type'] == 'gn':
-            self.norm = nn.GroupNorm(self.local_running_params['encoders']['normalization_layer']['gn']['num_groups'], self.num_enc_features)
+        elif self.local_running_params['encoders']['common']['normalization_layer']['type'] == 'gn':
+            self.norm = nn.GroupNorm(self.local_running_params['encoders']['common']['normalization_layer']['gn']['num_groups'], self.num_enc_features)
         else:
-            raise ValueError(f"Invalid normalization layer: {self.local_running_params['encoders']['normalization_layer']}. Choose 'bn', 'ln', or 'gn'.")
+            raise ValueError(f"Invalid normalization layer: {self.local_running_params['encoders']['common']['normalization_layer']}. Choose 'bn', 'ln', or 'gn'.")
 
-        def shape_by_granularity(granularity: str):
-            if granularity == 'channel':
-                return (self.num_enc_features, self.num_raw_features, 1)
-            elif granularity == 'neuron':
-                return (self.num_enc_features, self.num_raw_features, self.window_size)
-            else:
-                raise ValueError(f"Invalid granularity: {granularity}. Choose ['channel', 'neuron'].")
-
-        if self.local_running_params['encoders']['threshold_init'] == 'all-1s':
-            shape = shape_by_granularity(self.local_running_params['encoders']['granularity'])
-            self.init_threshold = torch.ones(size=shape)
-
-        elif self.local_running_params['encoders']['threshold_init'] == 'all-0s':
-            shape = shape_by_granularity(self.local_running_params['encoders']['granularity'])
-            self.init_threshold = torch.zeros(size=shape)
-
-        elif self.local_running_params['encoders']['threshold_init'] == 'random':
-            shape = shape_by_granularity(self.local_running_params['encoders']['granularity'])
-            self.init_threshold = torch.rand(size=shape)
-
-        elif self.local_running_params['encoders']['threshold_init'] == 'he':
-            shape = shape_by_granularity(self.local_running_params['encoders']['granularity'])
-            E = shape[0] # num_enc_features
-            C = shape[1] # num_raw_features
-            L = shape[2] # window_size
-            fan_in = C * L
-            std = math.sqrt(2.0 / fan_in)
-            self.init_threshold = torch.empty(E, C, L).normal_(mean=0.0, std=std)
-
-        elif self.local_running_params['encoders']['threshold_init'] == 'scalar':
-            self.init_threshold = 1.0
-
-        self.lif = snn.Leaky(
-            beta=0.99,
-            spike_grad=surrogate.atan(alpha=2.0),
-            init_hidden=True,
-            output=False,
-            threshold=self.init_threshold,
-            learn_threshold=self.learn_threshold,
-        )
-
-        self.second_chance = self.local_running_params['encoders']['second_chance']
-        self.sub_threshold_type = self.local_running_params['encoders']['sub_threshold']['type']
-        self.supra_threshold_type = self.local_running_params['encoders']['supra_threshold']['type']
+        if self.local_running_params['activations']['activation'] == 'binary':
+            self.act = SpikeActivation(
+                local_running_params=self.local_running_params,
+                num_features=self.num_raw_features,
+                ndim=4
+            )
+        elif self.local_running_params['activations']['activation'] == 'ternary':
+            self.act = TernarySpikeActivation(
+                local_running_params=self.local_running_params,
+            )
 
     def forward(self, inputs: torch.Tensor):
         raise NotImplementedError
 
     def second_chance_of_firing(self, activations: torch.Tensor, spikes: torch.Tensor):
+        raise NotImplementedError("Second chance of firing is not implemented in the base encoder class.") 
         """
         Args:
             activations: (B, E, C, L) feature map after Conv/BN
@@ -91,7 +61,7 @@ class BaseEncoder(nn.Module):
                     - scale_factor: scaling factor for adaptive margin
                     - margin: fixed margin for ternary spike
         """
-        threshold = self.lif.threshold
+        threshold = self.act.threshold
 
         distance = torch.abs(activations - threshold) 
         sign = torch.sign(activations - threshold) # 음수: threshold 미달, 양수: threshold 초과
@@ -152,11 +122,8 @@ class BaseEncoder(nn.Module):
 
             # 확률적으로 1→2 강화
             ternary_spikes = torch.bernoulli(supra_threshold_fire_prob)
-
             spikes = spikes + ternary_spikes
-
             spikes = spikes.clamp(0, 2)  # 스파이크 수를 0, 1, 2로 제한
-
         return spikes
 
 class PoissonEncoder(nn.Module):
@@ -180,8 +147,8 @@ class PoissonEncoder(nn.Module):
         return torch.mul(torch.le(random_input*rescale_fac, torch.abs(inputs)).float(), torch.under_sign(inputs))
 
 class RepeatEncoder(BaseEncoder):
-    def __init__(self, num_raw_features: int, local_running_params=None):
-        super().__init__(num_raw_features=num_raw_features, local_running_params=local_running_params)
+    def __init__(self, local_running_params, num_raw_features: int):
+        super().__init__(local_running_params=local_running_params, num_raw_features=num_raw_features)
 
     def forward(self, inputs: torch.Tensor):
         # inputs: batch, L, C
@@ -192,16 +159,13 @@ class RepeatEncoder(BaseEncoder):
 
         activations = self.norm(inputs)  # (B, E, C, L)
 
-        spikes = self.lif(activations)
-
-        if self.second_chance:
-            spikes = self.second_chance_of_firing(activations, spikes)
+        spikes = self.act(activations)
 
         return spikes # (B, E, C, L) <-
 
 class DeltaEncoder(BaseEncoder):
-    def __init__(self, num_raw_features: int, local_running_params=None):
-        super().__init__(num_raw_features=num_raw_features, local_running_params=local_running_params)
+    def __init__(self, local_running_params, num_raw_features: int):
+        super().__init__(local_running_params=local_running_params, num_raw_features=num_raw_features)
         
         self.encoder = nn.Linear(1, self.num_enc_features)
         self.norm = nn.BatchNorm2d(1)
@@ -215,10 +179,8 @@ class DeltaEncoder(BaseEncoder):
         delta = delta.permute(0, 2, 3, 1)  # batch, C, L, 1
         activations = self.encoder(delta)  # batch, C, L, num_enc_features
         activations = activations.permute(0, 3, 1, 2)  # batch, num_enc_features, C, L
-        spikes = self.lif(activations)
 
-        if self.second_chance:
-            spikes = self.second_chance_of_firing(activations, spikes)
+        spikes = self.act(activations)
 
         if outputs:
             return spikes, activations  # (B, E, C, L), (B, E, C, L)
@@ -226,17 +188,19 @@ class DeltaEncoder(BaseEncoder):
             return spikes # (B, E, C, L)
 
 class ConvEncoder(BaseEncoder):
-    def __init__(self, num_raw_features: int,
-                 kernel_size: int = 3, dilation: int = 1,
-                 local_running_params=None):
-        super().__init__(num_raw_features=num_raw_features, local_running_params=local_running_params)
+    def __init__(self, local_running_params, num_raw_features: int):
+        super().__init__(local_running_params=local_running_params, num_raw_features=num_raw_features)
+
+        kernel_size = self.local_running_params['encoders']['conv']['kernel_size']
+        stride = self.local_running_params['encoders']['conv']['stride']
+        dilation = self.local_running_params['encoders']['conv']['dilation']
         
         self.encoder = nn.Sequential(
             nn.Conv2d(
                 in_channels=1,
                 out_channels=self.num_enc_features,
                 kernel_size=(1, kernel_size),
-                stride=1,
+                stride=stride,
                 padding=(0, kernel_size // 2),
                 dilation=dilation,
             ),
@@ -250,10 +214,7 @@ class ConvEncoder(BaseEncoder):
 
         activations = self.norm(activations)  # batch, num_enc_features, C, L
 
-        spikes = self.lif(activations)
-
-        if self.second_chance:
-            spikes = self.second_chance_of_firing(activations, spikes)
+        spikes = self.act(activations)
 
         if outputs:
             return spikes, activations  # (B, E, C, L), (B, E, C, L)
@@ -269,7 +230,6 @@ def main():
     delta_encoder = DeltaEncoder(num_enc_features=10)
     conv_encoder = ConvEncoder(num_enc_features=10)
     
-
     # Dummy input
     inputs = torch.randn(1, 10, 3)  # (batch, length, num_features)
 
@@ -278,13 +238,11 @@ def main():
     out_delta = delta_encoder(inputs)
     out_conv = conv_encoder(inputs)
     
-
     print("Poisson Encoder Output Shape:", out_poisson.shape) 
     print("Repeat Encoder Output Shape:", out_repeat.shape) 
     print("Delta Encoder Output Shape:", out_delta.shape)
     print("Conv Encoder Output Shape:", out_conv.shape)
     
-
     # (B*E*C, L)로 변환
     enc_shape = out_conv.shape
     out_conv = out_conv.reshape(-1, enc_shape[3]) # (B*E*C, L)

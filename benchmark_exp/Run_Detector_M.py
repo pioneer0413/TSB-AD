@@ -11,7 +11,6 @@ from TSB_AD.utils.slidingWindows import find_length_rank
 from TSB_AD.model_wrapper import *
 from TSB_AD.HP_list import Optimal_Multi_algo_HP_dict
 from TSB_AD.snn.params import running_params
-import random
 
 # seeding
 seed = 2024
@@ -38,10 +37,15 @@ if __name__ == '__main__':
     parser.add_argument('--score_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/eval/score/multi/')
     parser.add_argument('--save_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/eval/metrics/multi/')
     parser.add_argument('--save', action='store_true', default=False)
-    parser.add_argument('--AD_Name', type=str, default='SpikeCNN', required=True)
-    parser.add_argument('--Encoder_Name', type=str, default=None)
+    parser.add_argument('--AD_Name', type=str, required=True)
+    parser.add_argument('--Encoder_Name', type=str, default=None, choices=['conv', 'repeat', 'delta', 'convmlp'])
     parser.add_argument('--postfix', type=str, default=None)
     parser.add_argument('--overwrite', action='store_true', default=False) # False=skip, True=overwrite
+    parser.add_argument('--off_cuda', action='store_true', default=False)
+
+    # Load
+    parser.add_argument('--load', action='store_true', default=False)
+    parser.add_argument('--load_file_code', type=str, default=None)
 
     # Visualization
     parser.add_argument('--verbose', action='store_true', default=False)
@@ -50,35 +54,38 @@ if __name__ == '__main__':
     parser.add_argument('--early_stop_off', action='store_false', default=True)
 
     # Independent Variables
+    parser.add_argument('--activation_type', type=str, default='ternary', choices=['binary', 'ternary'])
     parser.add_argument('--learn_threshold', action='store_true', default=False)
     parser.add_argument('--granularity', type=str, default='neuron')
-    parser.add_argument('--threshold_init', type=str, default='all-1s')  # updated default value
-    parser.add_argument('--normalization_layer', type=str, default='bn')
+    parser.add_argument('--threshold_init', type=str, default='scalar')  # updated default value
+    parser.add_argument('--bntt', action='store_true', default=False)
     parser.add_argument('--second_chance', action='store_true', default=False)
-    parser.add_argument('--sub_threshold_type', type=str, default='exponential')
-    parser.add_argument('--ternary', action='store_true', default=False)
-    parser.add_argument('--supra_threshold_type', type=str, default='linear')
-    parser.add_argument('--adaptive_margin', action='store_true', default=False)
+
+    # Adversarial
+    parser.add_argument('--adversarial_type', type=str, default=None, choices=['fgsm', 'pgd'])
+
     args = parser.parse_args()
 
     # Reset Independent Variable of running_params
     local_running_params = running_params.copy()
+
+    local_running_params['load'] = args.load
+    local_running_params['postfix'] = args.postfix
+    local_running_params['off_cuda'] = args.off_cuda
 
     local_running_params['verbose'] = args.verbose
     local_running_params['save_encoding'] = args.save_encoding
     local_running_params['trace_threshold'] = args.trace_threshold
     local_running_params['early_stop'] = args.early_stop_off
 
-    local_running_params['encoders']['learn_threshold'] = args.learn_threshold
-    local_running_params['encoders']['granularity'] = args.granularity
-    local_running_params['encoders']['threshold_init'] = args.threshold_init
-    local_running_params['encoders']['normalization_layer']['type'] = args.normalization_layer
-    local_running_params['encoders']['second_chance'] = args.second_chance
-    local_running_params['encoders']['sub_threshold']['type'] = args.sub_threshold_type
-    local_running_params['encoders']['ternary'] = args.ternary
-    local_running_params['encoders']['supra_threshold']['type'] = args.supra_threshold_type
-    local_running_params['encoders']['sub_threshold']['linear']['adaptive_margin'] = args.adaptive_margin  # new mapping
-    local_running_params['encoders']['supra_threshold']['linear']['adaptive_margin'] = args.adaptive_margin   # new mapping
+    local_running_params['activations']['activation'] = args.activation_type
+    local_running_params['activations']['binary']['learn_threshold'] = args.learn_threshold
+    local_running_params['activations']['binary']['granularity'] = args.granularity
+    local_running_params['activations']['binary']['threshold_init'] = args.threshold_init
+    local_running_params['activations']['binary']['bntt'] = args.bntt
+    local_running_params['activations']['binary']['second_chance'] = args.second_chance
+
+    local_running_params['adversarial']['type'] = args.adversarial_type
 
     if args.Encoder_Name is not None:
         target_dir = os.path.join(args.score_dir, args.AD_Name, args.Encoder_Name)
@@ -86,7 +93,7 @@ if __name__ == '__main__':
         target_dir = os.path.join(args.score_dir, args.AD_Name)
 
     if args.postfix is not None:
-        target_dir = os.path.join(target_dir, args.postfix)
+        target_dir = f'{target_dir}_{args.postfix}'
     os.makedirs(target_dir, exist_ok = True)
 
     # 같은 파일 코드 생성 방지를 위해 0.1~0.5초 사이의 랜덤한 숫자 생성
@@ -111,16 +118,16 @@ if __name__ == '__main__':
         file_number = max_num + 1
         # 새로운 파일 이름 생성
         if args.Encoder_Name is not None:
-            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.Encoder_Name}.log'
+            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.Encoder_Name}_{args.postfix}.log'
         else:
-            file_name = f'{file_number:03d}_run_{args.AD_Name}.log'
+            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.postfix}.log'
     else:
         file_number = 0
         # 새로운 파일 이름 생성
         if args.Encoder_Name is not None:
-            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.Encoder_Name}.log'
+            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.Encoder_Name}_{args.postfix}.log'
         else:
-            file_name = f'{file_number:03d}_run_{args.AD_Name}.log'
+            file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.postfix}.log'
     log_file_path = os.path.join(log_dir_path, file_name)
     id_code = file_number
 
@@ -148,7 +155,6 @@ if __name__ == '__main__':
     #print('Optimal_Det_HP: ', Optimal_Det_HP)
 
     write_csv = []
-    execution_status = []
     for filename in file_list:
         if os.path.exists(target_dir+'/'+filename.split('.')[0]+'.npy') and args.overwrite is False : continue
         print('Processing:{} by {}'.format(filename, args.AD_Name))
@@ -167,13 +173,40 @@ if __name__ == '__main__':
 
         try:
             if args.AD_Name in Semisupervise_AD_Pool:
+
+                parts = filename.split('_')
+                
+                if local_running_params['save']:
+                    if args.Encoder_Name is not None:
+                        file_name = f'{args.AD_Name}_{id_code:03d}_{args.Encoder_Name}_{args.postfix}_{parts[0]}_{parts[1]}.pt'
+                    else:
+                        file_name = f'{args.AD_Name}_{id_code:03d}_{args.postfix}_{parts[0]}_{parts[1]}.pt'
+                    local_running_params['save_file_path'] = os.path.join(root_dir_path, 'weights', file_name)
+
+                if local_running_params['load']:
+                    if args.Encoder_Name is not None:
+                        load_file_list = os.listdir(os.path.join(root_dir_path, 'weights'))
+                        # load_file_list에서 AD_Name과 args.load_file_code, parts[0], parts[1]를 포함하는 파일 찾기
+                        file_name = [f for f in load_file_list if args.AD_Name in f and args.load_file_code in f and parts[0] in f and parts[1] in f]
+                    local_running_params['load_file_path'] = os.path.join(root_dir_path, 'weights', file_name[0])
+
                 output = run_Semisupervise_AD(data_train=data_train, data_test=data, TS_Name=filename, AD_Name=args.AD_Name, Encoder_Name=args.Encoder_Name, local_running_params=local_running_params, **Optimal_Det_HP)
+                
             elif args.AD_Name in Unsupervise_AD_Pool:
                 output = run_Unsupervise_AD(args.AD_Name, data, **Optimal_Det_HP)
             else:
                 raise Exception(f"{args.AD_Name} is not defined")
         except Exception as e:
-            execution_status.append(f'{filename}: {e}')
+            import traceback
+            tb = traceback.extract_tb(e.__traceback__)
+            if tb:
+                last_call = tb[-1]
+                print(f'Run_Detector_M error in {last_call.filename} at line {last_call.lineno}: {e}')
+            else:
+                print(f'Run_Detector_M error: {e}')
+            # log_file_path에 에러 메시지 기록
+            with open(log_file_path, 'a') as f:
+                f.write(f'\nRun_Detector_M error in {last_call.filename} at line {last_call.lineno}: {e}\n')
 
         end_time = time.time()
         run_time = end_time - start_time
@@ -218,10 +251,3 @@ if __name__ == '__main__':
         # run_time 기록
         f.write('\n')
         f.write('Total Run Time: {:.3f}s\n'.format(time.time() - Start_T))
-
-        # 실행 성공 여부 기록
-        if len(execution_status) > 0:
-            f.write('\n')
-            f.write('Execution Status:\n')
-            for status in execution_status:
-                f.write(f'{status}\n')
