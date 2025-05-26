@@ -10,11 +10,13 @@ running_params = {
 
     'off_cuda': False,
 
+    'AD_Name': None,
+    'Encoder_Name': None,
     'postfix': None,
+    'id_code': 0,
 
     'verbose': False,         # Visualization
-    'save_encoding': False,     # Visualization
-    'trace_threshold': False,   # Visualization
+    'analysis': False,
     'early_stop': True,     
     
     'batch_size': 128,          
@@ -24,6 +26,8 @@ running_params = {
     'num_enc_features': 8,      
     'window_size': 50,          
     'predict_time_steps': 1,    
+
+    'zero_pruning': False,
 
     'adversarial':{
         'type': 'fgsm',
@@ -37,6 +41,10 @@ running_params = {
             'nb_iter': 40,       
             'norm': np.inf
         }
+    },
+
+    'CNN': {
+        'encoding': False,
     },
     
     'SpikeCNN': {
@@ -56,37 +64,48 @@ running_params = {
         'dropout_rate': 0.25,
     },
 
+    'normalization_layer': {    
+        'type': 'bn',       # [bn, ln, gn, bntt, None]
+        'gn': {
+            'num_groups': 4
+        }
+    },
+
     'activations': {
         'activation': 'ternary',
         'common': {
             'num_steps': 10,
             'beta': 0.99,           
         },
+        'dynamic_receptive': {
+            'adaptation': False,
+            'sensitization': False,
+            'delta_activation': False,
+            'burst': False,
+            'learn_threshold': False,
+            'granularity': 'scalar',
+            'learn_beta': False,
+            'reset_mechanism': 'subtract',
+            'integration': 'concat',
+        },
         'binary': {
             'learn_threshold': False,
             'granularity': 'neuron',    
             'threshold_init': 'all-1s', 
-            'bntt': False,
             'second_chance': False,     
             'deterministic': False,     
             'rate_encode': False,
+            'adaptive': False,
         },
         'ternary': {
             'pos_threshold': 1.0,
             'neg_threshold': -1.0,
+            'adaptive': False,
         },
     },
 
     'encoders': {
         'type': 'conv',
-        'common': {
-            'normalization_layer': {    
-                'type': 'bn',       
-                'gn': {
-                    'num_groups': 4
-                }
-            },
-        },
         'poisson': {
 
         },

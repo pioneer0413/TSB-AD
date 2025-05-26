@@ -60,6 +60,16 @@ def run_CNN(data_train, data_test, # 데이터
             window_size=100, num_channel=[32, 40], lr=0.0008, n_jobs=1): # 하이퍼파라미터
 
     from .models.CNN import CNN
+
+    # zero_pruning 옵션이 켜져 있고, 실제로 모두 0인 컬럼이 하나라도 있을 때만 진입
+    if local_running_params['zero_pruning']:
+        mask = np.any(data_test != 0, axis=0)
+        num_zero = np.sum(~mask)
+        if num_zero > 0:
+            # 필요한 경우에만 슬라이싱 + 메모리 레이아웃 고정
+            data_train = np.ascontiguousarray(data_train[:, mask])
+            data_test  = np.ascontiguousarray(data_test[:, mask])
+
     clf = CNN(TS_Name=TS_Name, AD_Name=AD_Name, # 메타 데이터
               batch_size=128,
               window_size=window_size, num_channel=num_channel, lr=lr,  # 하이퍼파라미터
@@ -89,6 +99,16 @@ def run_SpikeCNN(data_train, data_test, # 데이터
              window_size=100, num_channel=[32, 40], num_enc_features=8, lr=0.0008, n_jobs=1): # 하이퍼파라미터
              
     from .models.SpikeCNN import SpikeCNN
+
+    # zero_pruning 옵션이 켜져 있고, 실제로 모두 0인 컬럼이 하나라도 있을 때만 진입
+    if local_running_params['zero_pruning']:
+        mask = np.any(data_test != 0, axis=0)
+        num_zero = np.sum(~mask)
+        if num_zero > 0:
+            # 필요한 경우에만 슬라이싱 + 메모리 레이아웃 고정
+            data_train = np.ascontiguousarray(data_train[:, mask])
+            data_test  = np.ascontiguousarray(data_test[:, mask])
+
     clf = SpikeCNN(TS_Name=TS_Name, AD_Name=AD_Name, Encoder_Name=Encoder_Name, # 메타 데이터
                num_raw_features=data_test.shape[1], local_running_params=local_running_params)
 
@@ -214,7 +234,7 @@ def run_Sub_PCA(data, periodicity=1, n_components=None, n_jobs=1):
 
 def run_PCA(data, slidingWindow=100, n_components=None, n_jobs=1):
     from .models.PCA import PCA
-    clf = PCA(slidingWindow = slidingWindow, n_components=n_components)
+    clf = PCA(slidingWindow = slidingWindow, n_components=n_components, zero_pruning=False)
     clf.fit(data)
     score = clf.decision_scores_
     return score.ravel()

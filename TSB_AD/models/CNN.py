@@ -11,6 +11,7 @@ from ..utils.utility import get_activation_by_name
 from ..utils.dataset import ForecastDataset
 from ..snn.utils import loss_visualization
 from ..snn.params import running_params
+from TSB_AD.snn.encoders import ReLUEncoder
 
 class AdaptiveConcatPool1d(nn.Module):
     def __init__(self):
@@ -31,10 +32,13 @@ class CNNModel(nn.Module):
                  predict_time_steps=1,
                  dropout_rate=0.25,
                  hidden_activation='relu',
+                 local_running_params=None,
                  ):
 
         # initialize the super class
         super(CNNModel, self).__init__()
+
+        assert local_running_params is not None, "local_running_params must be provided"
 
         self.device = device
 
@@ -47,18 +51,28 @@ class CNNModel(nn.Module):
         self.dropout_rate = dropout_rate
         self.hidden_activation = hidden_activation
 
+        self.local_running_params = local_running_params
+        self.num_enc_features = local_running_params['num_enc_features']
+
+        if local_running_params['CNN']['encoding']:
+            self.encoder = ReLUEncoder(
+                local_running_params=local_running_params,
+                num_raw_features=self.num_in_features,
+            )
+
         # get the object for the activations functions
         self.activation = get_activation_by_name(hidden_activation)
 
         # initialize encoder and decoder as a sequential
         self.conv_layers = nn.Sequential()
-        prev_channels = self.num_in_features
+        prev_channels = self.num_enc_features if local_running_params['CNN']['encoding'] else self.num_in_features
 
         for idx, out_channels in enumerate(self.num_channel):
             self.conv_layers.add_module(
                 "conv" + str(idx),
                 torch.nn.Conv1d(prev_channels, self.num_channel[idx], 
                 self.kernel_size, self.stride))
+            self.conv_layers.add_module("bn" + str(idx), torch.nn.BatchNorm1d(self.num_channel[idx]))
             self.conv_layers.add_module(self.hidden_activation + str(idx),
                                     self.activation)
             self.conv_layers.add_module("pool" + str(idx), nn.MaxPool1d(kernel_size=2))
@@ -76,6 +90,8 @@ class CNNModel(nn.Module):
     def forward(self, x):
         b, l, c = x.shape
         x = x.view(b, c, l)
+        if self.local_running_params['CNN']['encoding']:
+            x = self.encoder(x)         # [B, E, L] <- [B, C, L]
         x = self.conv_layers(x)     # [128, feature, 23]
 
         outputs = torch.zeros(self.predict_time_steps, b, self.num_in_features).to(self.device)
@@ -103,7 +119,8 @@ class CNN(Base.BaseModule):
         self.model = CNNModel(device=self.device,
                               num_channel=self.num_channel,
                               num_in_features=self.num_raw_features, 
-                              predict_time_steps=self.pred_len).to(self.device)
+                              predict_time_steps=self.pred_len,
+                              local_running_params=local_running_params).to(self.device)
         
         if self.local_running_params['load']:
             self.model.load_state_dict(torch.load(self.local_running_params['load_file_path']))

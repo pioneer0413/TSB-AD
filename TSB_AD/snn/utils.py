@@ -1,6 +1,8 @@
 from torch import nn
 import torch
 import torch.nn.functional as F
+import os
+import numpy as np
 
 class Chomp1d(nn.Module):
     def __init__(self, chomp_size):
@@ -76,6 +78,49 @@ def calculate_output_size(input_size, kernel_size, stride, padding, dilation):
         Output size after convolution
     """
     return (input_size + 2 * padding - dilation * (kernel_size - 1) - 1) // stride + 1
+
+class BaseTracer():
+    def __init__(self, local_running_params):
+        self.local_running_params = local_running_params
+        self.dst_dir_path = f'/home/hwkang/dev-TSB-AD/TSB-AD/analyses/exports'
+        self.file_name = f'{self.id_code}_{self.AD_Name}_{self.Encoder_Name}_{self.postfix}'
+
+class EncodingTracer(BaseTracer):
+    def __init__(self, local_running_params):
+        super().__init__(local_running_params=local_running_params)
+        self.spike_rate_trend = []
+        self.threshold_trend = []
+        self.normalization_gamma_trend = []
+        self.normalization_beta_trend = []
+    
+    def export_spike_rate_trend(self):
+        pass
+    
+    def export_threshold_trend(self):
+        pass
+    
+    def export_normalization_trend(self):
+        pass
+
+class LearningTracer(BaseTracer):
+    def __init__(self, local_running_params):
+        super().__init__(local_running_params=local_running_params)
+        self.train_loss_tracer = []
+        self.valid_loss_tracer = []
+        #self.gradient_trend = []
+        #self.gradient_distribution = []
+    
+    def export_loss(self):
+        target = 'loss.npz'
+        file_name = f'{self.file_name}_{target}'
+        save_file_path = os.path.join(self.dst_dir_path, file_name)
+        np.savez(save_file_path, train_loss_trend=self.train_loss_tracer, valid_loss_trend=self.valid_loss_tracer)
+    
+    def export_gradient(self):
+        pass
+
+        
+
 
 if __name__ == "__main__":
     input_size = 50

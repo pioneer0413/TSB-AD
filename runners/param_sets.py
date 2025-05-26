@@ -1,11 +1,17 @@
 ####
 # Test
 ####
+raw_command = 'python benchmark_exp/Run_Detector_M.py --AD_Name PCA --postfix test --overwrite'
+raw_command_SpikeCNN = 'python benchmark_exp/Run_Detector_M.py --AD_Name SpikeCNN --Encoder_Name dynamic_receptive --verbose --save --postfix dr_test --overwrite --adaptation --sensitization --integration sum'
 param_set_test = [
     # CNN
-    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--save', '--AD_Name', 'CNN', '--postfix', 'test'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--save', '--AD_Name', 'CNN', '--postfix', 'test'],
     # Baseline(no learn, no ternary)
-    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 'test'],
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 'test_bn', '--norm_layer_type', 'bn'],
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 'test_gn', '--norm_layer_type', 'gn'],
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 'test_ln', '--norm_layer_type', 'ln'],
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 'test_bntt', '--norm_layer_type', 'bntt'],
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 'test_None', '--norm_layer_type', 'None'],
 ]
 
 ####
@@ -13,10 +19,7 @@ param_set_test = [
 ####
 # AB: All Baselines
 param_set_AB = [
-    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save', '--AD_Name', 'OCSVM', '--postfix', 'baseline', '--overwrite'],
-    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save', '--AD_Name', 'MCD', '--postfix', 'baseline', '--overwrite'],
-    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save', '--AD_Name', 'KNN', '--postfix', 'baseline', '--overwrite'],
-    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save', '--AD_Name', 'KMeansAD', '--postfix', 'baseline', '--overwrite'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save', '--AD_Name', 'PCA', '--postfix', 'baseline', '--overwrite'],
 ]
 # Baseline: all TSB-AD-M algorithms
 param_set_1_1 = [
@@ -527,4 +530,382 @@ param_set_16_2 = [
     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save', '--AD_Name', 'CNN', '--postfix', 's15_baseline_gpu'],
     # Baseline(no learn, no ternary) (GPU)
     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's16_baseline_gpu', '--activation_type', 'binary'],
+]
+
+####
+# S17: TernarySpikeActivation gamma-beta
+####
+param_set_17 = [
+    # Ternary: 1st
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_ternary_bn_1st', '--norm_layer_type', 'bn'],
+    # Ternary:ON
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_bn', '--norm_layer_type', 'bn'],
+    # CNN+BN
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'CNN', '--postfix', 's17_cnn_bn'],
+    # Ternary:OFF
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_ternary_bn_off', '--norm_layer_type', 'bn',],
+    # Binary:ON
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_binary_bn_on', '--norm_layer_type', 'bn', '--activation_type', 'binary', '--binary_adaptive'],
+    # Binary:OFF
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_binary_bn_off', '--norm_layer_type', 'bn', '--activation_type', 'binary'],
+    # Binary:None
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_binary_bn_None', '--norm_layer_type', 'None', '--activation_type', 'binary'],
+]
+param_set_17_2 = [
+    # Ternary:1st:ON
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_ternary_bn_1st_on', '--norm_layer_type', 'bn', '--ternary_adaptive'],
+    # Binary:1st:ON
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_binary_bn_1st_on', '--norm_layer_type', 'bn', '--activation_type', 'binary', '--binary_adaptive'],
+]
+param_set_17_3 = [
+    # Ternary:encoding
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_ternary_encoding', '--norm_layer_type', 'bn'],
+    # Binary:encoding
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's17_binary_encoding', '--norm_layer_type', 'None', '--activation_type', 'binary'],
+]
+
+####
+# S18: Zero Pruning
+####
+param_set_18 = [
+    # CNN:ON
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'CNN', '--postfix', 's18_cnn_zp_on', '--zero_pruning'],
+    # CNN:OFF
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'CNN', '--postfix', 's18_cnn_zp_off'],
+    # Binary:ON
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's18_binary_zp_on', '--norm_layer_type', 'None', '--activation_type', 'binary', '--zero_pruning'],
+    # Binary:OFF
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's18_binary_zp_off', '--norm_layer_type', 'None', '--activation_type', 'binary'],
+    # Ternary:ON
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's18_ternary_zp_on', '--norm_layer_type', 'bn', '--zero_pruning'],
+    # Ternary:OFF
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', '--postfix', 's18_ternary_zp_off', '--norm_layer_type', 'bn'],
+]
+param_set_18_2 = [
+    # PCA:OFF
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save', '--AD_Name', 'PCA', '--postfix', 's18_pca_zp_off', '--overwrite'],
+]
+
+####
+# S20: Dynamic Receptive Encoding
+####
+param_set_20_1 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXXX'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OXXX', '--adaptation'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OOXX', '--adaptation', '--sensitization'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OOOX', '--adaptation', '--sensitization', '--delta_activation'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OOOO', '--adaptation', '--sensitization', '--delta_activation', '--burst'],
+]
+
+param_set_20_2 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOX', '--delta_activation',],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXXO', '--burst'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Mini-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/mini', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOO', '--delta_activation', '--burst'],
+]
+
+param_set_20_3 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXXX'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OXXX', '--adaptation'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OOXX', '--adaptation', '--sensitization'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OOOX', '--adaptation', '--sensitization', '--delta_activation'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+    '--postfix', 's20_dre_OOOO', '--adaptation', '--sensitization', '--delta_activation', '--burst'],
+    
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOX', '--delta_activation',],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXXO', '--burst'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOO', '--delta_activation', '--burst'],
+    
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOX', '--delta_activation', '--integration', 'sum'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXXO', '--burst', '--integration', 'sum'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOO', '--delta_activation', '--burst', '--integration', 'sum'],
+    
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_binary', '--activation_type', 'binary', '--norm_layer_type', 'None',],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_ternary', '--activation_type', 'ternary', '--norm_layer_type', 'bn',],
+]
+raw_command_20_PCA = 'python benchmark_exp/Run_Detector_M.py --file_list /home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv --save_dir /home/hwkang/dev-TSB-AD/TSB-AD/eval/medium --AD_Name PCA --postfix s20_pca --overwrite --save'
+raw_command_20_CNN = 'python benchmark_exp/Run_Detector_M.py --file_list /home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv --save_dir /home/hwkang/dev-TSB-AD/TSB-AD/eval/medium --AD_Name CNN --postfix s20_cnn --overwrite --save'
+
+param_set_20_4 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OOOO', '--delta_activation', '--learn_threshold', '--learn_beta', '--reset_mechanism', 'subtract', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OOOX', '--delta_activation', '--learn_threshold', '--learn_beta', '--reset_mechanism', 'subtract', '--integration', 'sum'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OOXO', '--delta_activation', '--learn_threshold', '--learn_beta', '--reset_mechanism', 'zero', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OOXX', '--delta_activation', '--learn_threshold', '--learn_beta', '--reset_mechanism', 'zero', '--integration', 'sum'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OXOX', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'sum'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_OXXX', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'sum'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XOOO', '--delta_activation', '--learn_beta', '--reset_mechanism', 'subtract', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XOOX', '--delta_activation', '--learn_beta', '--reset_mechanism', 'subtract', '--integration', 'sum'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XOXO', '--delta_activation', '--learn_beta', '--reset_mechanism', 'zero', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XOXX', '--delta_activation', '--learn_beta', '--reset_mechanism', 'zero', '--integration', 'sum'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXXO', '--delta_activation', '--reset_mechanism', 'zero', '--integration', 'concat'],
+
+     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_XXXX', '--delta_activation', '--reset_mechanism', 'zero', '--integration', 'sum'],
+]
+
+# Binary
+param_set_20_5_1 = [
+    # num_enc_features = 2
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc2_binary', '--activation_type', 'binary', '--norm_layer_type', 'None', '--num_enc_features', '2'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc2_ternary', '--activation_type', 'ternary', '--norm_layer_type', 'bn', '--num_enc_features', '2'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc2_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '2'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc2_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '2'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc2_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '2'],
+    # num_enc_features = 4
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc4_binary', '--activation_type', 'binary', '--norm_layer_type', 'None', '--num_enc_features', '4'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc4_ternary', '--activation_type', 'ternary', '--norm_layer_type', 'bn', '--num_enc_features', '4'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc4_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '4'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc4_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '4'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc4_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '4'],
+]
+param_set_20_5_2 = [
+    # num_enc_features = 16
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc16_binary', '--activation_type', 'binary', '--norm_layer_type', 'None', '--num_enc_features', '16'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc16_ternary', '--activation_type', 'ternary', '--norm_layer_type', 'bn', '--num_enc_features', '16'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc16_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '16'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc16_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '16'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc16_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '16'],
+    # num_enc_features = 32
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc32_binary', '--activation_type', 'binary', '--norm_layer_type', 'None', '--num_enc_features', '32'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc32_ternary', '--activation_type', 'ternary', '--norm_layer_type', 'bn', '--num_enc_features', '32'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc32_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '32'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc32_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '32'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc32_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '32'],
+]
+param_set_20_5_3 = [
+    # num_enc_features = 64
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc64_binary', '--activation_type', 'binary', '--norm_layer_type', 'None', '--num_enc_features', '64'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_enc64_ternary', '--activation_type', 'ternary', '--norm_layer_type', 'bn', '--num_enc_features', '64'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc64_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '64'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc64_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '64'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc64_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '64'],
+]
+
+# Ternary
+param_set_20_5_4 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc2_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '2', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc2_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '2', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc2_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '2', '--activation_type', 'ternary'],
+
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc4_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '4', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc4_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '4', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc4_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '4', '--activation_type', 'ternary'],
+
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc16_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '16', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc16_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '16', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc16_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '16', '--activation_type', 'ternary'],
+]
+param_set_20_5_5 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc32_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '32', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc32_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '32', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc32_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '32', '--activation_type', 'ternary'],
+
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc64_OXXO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'zero', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc64_XXOO', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'concat', '--num_enc_features', '64', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc64_XXOX', '--delta_activation', '--reset_mechanism', 'subtract', '--integration', 'sum', '--num_enc_features', '64', '--activation_type', 'ternary'],
+]
+
+# OXXO -> OXOO # Binary
+param_set_20_5_6 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc2_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '2'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc4_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '4'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc16_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '16'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc32_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '32'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_enc64_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64'],
+
+]
+# Ternary
+param_set_20_5_7 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc2_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '2', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc4_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '4', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc16_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '16', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc32_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '32', '--activation_type', 'ternary'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_dre_Tenc64_OXOO', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary'],
+]
+# CNN+ReLUEncoder
+param_set_20_6 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_enc2_cnn', '--num_enc_features', '2'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_enc4_cnn', '--num_enc_features', '4'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_enc8_cnn', '--num_enc_features', '8'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_enc16_cnn', '--num_enc_features', '16'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_enc32_cnn', '--num_enc_features', '32'],
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_enc64_cnn', '--num_enc_features', '64'],
+]
+# Full Evaluation
+param_set_20_7 = [
+    # Binary-e32
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_full_binary-e32', '--activation_type', 'binary', '--norm_layer_type', 'None', '--num_enc_features', '32'],
+    
+    # Ternary-front
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'conv', 
+     '--postfix', 's20_full_ternary-front', '--activation_type', 'ternary', '--norm_layer_type', 'bn'],
+    
+    # OXOO
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_full_OXOO-Tenc64', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary'],
+    
+    # CNN-l2
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_full_cnn-l2'],
+    
+    # CNN-e
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'CNN', 
+     '--postfix', 's20_full_cnn-e64', '--num_enc_features', '64', '--encoding'],
+]
+# OXOO + BF + BC
+# Medium
+param_set_20_8_1 = [
+    # OXOO + BF + TC
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_medium_OXOO-BF-TC', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--burst'],   
+    # OXOO + BF + BC
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_medium_OXOO-BF-BC', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'binary', '--burst'],   
+    # OXOO + BC
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_medium_OXOO-BC', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'binary'],   
+]
+# Full
+param_set_20_8_2 = [
+    # OXOO + BF + TC
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_full_OXOO-BF-TC', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--burst'],   
+    # OXOO + BF + BC
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_full_OXOO-BF-BC', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'binary', '--burst'],   
+    # OXOO + BC
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_full_OXOO-BC', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'binary'],
+]
+# slidingWindowLength: [25, 75, 100, 125]
+param_set_20_9 = [
+    # 25
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_medium_win25', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--window_size', '25'],
+    # 75
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_medium_win75', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--window_size', '75'],
+    # 100
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_medium_win100', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--window_size', '100'],
+    # 125
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_medium_win125', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--window_size', '125'],
+]
+param_set_20_10 = [
+    # OXOO+TC+neuron
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_full_OXOO-TC-neuron', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--dr_granularity', 'neuron'],
+    # OXOO+BF+TC+neuron
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
+     '--postfix', 's20_full_OXOO-BF-TC-neuron', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--burst', '--dr_granularity', 'neuron'],
 ]

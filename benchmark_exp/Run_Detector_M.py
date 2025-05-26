@@ -35,10 +35,10 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/TSB-AD-M')
     parser.add_argument('--file_list', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv')
     parser.add_argument('--score_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/eval/score/multi/')
-    parser.add_argument('--save_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/eval/metrics/multi/')
+    parser.add_argument('--save_dir', type=str, default='/home/hwkang/dev-TSB-AD/TSB-AD/eval/metrics/tiny/')
     parser.add_argument('--save', action='store_true', default=False)
     parser.add_argument('--AD_Name', type=str, required=True)
-    parser.add_argument('--Encoder_Name', type=str, default=None, choices=['conv', 'repeat', 'delta', 'convmlp'])
+    parser.add_argument('--Encoder_Name', type=str, default=None, choices=['conv', 'repeat', 'delta', 'convmlp', 'dynamic_receptive'])
     parser.add_argument('--postfix', type=str, default=None)
     parser.add_argument('--overwrite', action='store_true', default=False) # False=skip, True=overwrite
     parser.add_argument('--off_cuda', action='store_true', default=False)
@@ -53,13 +53,34 @@ if __name__ == '__main__':
     parser.add_argument('--trace_threshold', action='store_true', default=False)
     parser.add_argument('--early_stop_off', action='store_false', default=True)
 
+    # Common
+    parser.add_argument('--num_enc_features', type=int, default=8)
+    parser.add_argument('--window_size', type=int, default=50, help='Window size for encoding')
+
     # Independent Variables
-    parser.add_argument('--activation_type', type=str, default='ternary', choices=['binary', 'ternary'])
-    parser.add_argument('--learn_threshold', action='store_true', default=False)
+    parser.add_argument('--zero_pruning', action='store_true', default=False)
+    parser.add_argument('--norm_layer_type', type=str, default=None, choices=['bn', 'ln', 'gn', 'bntt', 'None'])
+    parser.add_argument('--activation_type', type=str, default='binary', choices=['binary', 'ternary'])
+    #parser.add_argument('--learn_threshold', action='store_true', default=False)
     parser.add_argument('--granularity', type=str, default='neuron')
     parser.add_argument('--threshold_init', type=str, default='scalar')  # updated default value
-    parser.add_argument('--bntt', action='store_true', default=False)
     parser.add_argument('--second_chance', action='store_true', default=False)
+    parser.add_argument('--binary_adaptive', action='store_true', default=False)
+    parser.add_argument('--ternary_adaptive', action='store_true', default=False)
+
+    # Dynamic Receptive Encoder
+    parser.add_argument('--adaptation', action='store_true', default=False)
+    parser.add_argument('--sensitization', action='store_true', default=False)
+    parser.add_argument('--delta_activation', action='store_true', default=False)
+    parser.add_argument('--burst', action='store_true', default=False)
+    parser.add_argument('--learn_threshold', action='store_true', default=False)
+    parser.add_argument('--dr_granularity', type=str, default='scalar', choices=['neuron', 'scalar'])
+    parser.add_argument('--learn_beta', action='store_true', default=False)
+    parser.add_argument('--reset_mechanism', type=str, default='subtract', choices=['subtract', 'zero'])
+    parser.add_argument('--integration', type=str, default='concat', choices=['concat', 'sum'])
+
+    # CNN
+    parser.add_argument('--encoding', action='store_true', default=False)
 
     # Adversarial
     parser.add_argument('--adversarial_type', type=str, default=None, choices=['fgsm', 'pgd'])
@@ -70,6 +91,8 @@ if __name__ == '__main__':
     local_running_params = running_params.copy()
 
     local_running_params['load'] = args.load
+    local_running_params['AD_Name'] = args.AD_Name
+    local_running_params['Encoder_Name'] = args.Encoder_Name
     local_running_params['postfix'] = args.postfix
     local_running_params['off_cuda'] = args.off_cuda
 
@@ -78,12 +101,32 @@ if __name__ == '__main__':
     local_running_params['trace_threshold'] = args.trace_threshold
     local_running_params['early_stop'] = args.early_stop_off
 
+    local_running_params['num_enc_features'] = args.num_enc_features
+    local_running_params['window_size'] = args.window_size
+
+    local_running_params['zero_pruning'] = args.zero_pruning
+    local_running_params['normalization_layer']['type'] = args.norm_layer_type
     local_running_params['activations']['activation'] = args.activation_type
-    local_running_params['activations']['binary']['learn_threshold'] = args.learn_threshold
+    #local_running_params['activations']['binary']['learn_threshold'] = args.learn_threshold
     local_running_params['activations']['binary']['granularity'] = args.granularity
     local_running_params['activations']['binary']['threshold_init'] = args.threshold_init
-    local_running_params['activations']['binary']['bntt'] = args.bntt
     local_running_params['activations']['binary']['second_chance'] = args.second_chance
+    local_running_params['activations']['binary']['adaptive'] = args.binary_adaptive
+    local_running_params['activations']['ternary']['adaptive'] = args.ternary_adaptive
+
+    # Dynamic Receptive Encoder
+    local_running_params['activations']['dynamic_receptive']['adaptation'] = args.adaptation
+    local_running_params['activations']['dynamic_receptive']['sensitization'] = args.sensitization
+    local_running_params['activations']['dynamic_receptive']['delta_activation'] = args.delta_activation
+    local_running_params['activations']['dynamic_receptive']['burst'] = args.burst
+    local_running_params['activations']['dynamic_receptive']['learn_threshold'] = args.learn_threshold
+    local_running_params['activations']['dynamic_receptive']['granularity'] = args.dr_granularity
+    local_running_params['activations']['dynamic_receptive']['learn_beta'] = args.learn_beta
+    local_running_params['activations']['dynamic_receptive']['reset_mechanism'] = args.reset_mechanism
+    local_running_params['activations']['dynamic_receptive']['integration'] = args.integration
+
+    # CNN
+    local_running_params['CNN']['encoding'] = args.encoding
 
     local_running_params['adversarial']['type'] = args.adversarial_type
 
@@ -130,6 +173,8 @@ if __name__ == '__main__':
             file_name = f'{file_number:03d}_run_{args.AD_Name}_{args.postfix}.log'
     log_file_path = os.path.join(log_dir_path, file_name)
     id_code = file_number
+
+    local_running_params['id_code'] = id_code
 
     with open(log_file_path, 'w') as f:
         f.write('Arguments:\n')
@@ -220,8 +265,15 @@ if __name__ == '__main__':
         ### whether to save the evaluation result
         if args.save:
             try:
+                print('output: ', output.shape)
+                print('label: ', label.shape)
+
+                if len(label) != len(output):
+                    # pad label to match the length of output with 0
+                    label = np.pad(label, (0, len(output) - len(label)), 'constant', constant_values=0)
+
                 evaluation_result = get_metrics(output, label, slidingWindow=slidingWindow)
-                #print('evaluation_result: ', evaluation_result)
+                print('evaluation_result: ', evaluation_result)
                 list_w = list(evaluation_result.values())
             except:
                 list_w = [0]*9

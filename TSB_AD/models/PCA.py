@@ -236,8 +236,10 @@ class PCA(BaseDetector):
             X, self.scaler_ = standardizer(X, keep_scalar=True)
 
         if self.zero_pruning:
+            print("Zero pruning is applied to the data")
             non_zero_columns = np.any(X != 0, axis=0)
             X = X[:, non_zero_columns]
+        print("Out of ZP")
 
         self.detector_ = sklearn_PCA(n_components=self.n_components,
                                      copy=self.copy,

@@ -32,6 +32,8 @@ class BaseModule():
         self.TS_Name = TS_Name
         self.AD_Name = AD_Name
         self.Encoder_Name = Encoder_Name
+        self.postfix = local_running_params['postfix']
+        self.id_code = local_running_params['id_code']
 
         if self.AD_Name == 'SpikeCNN':
             # 훈련 루프 하이퍼파라미터
