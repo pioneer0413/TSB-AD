@@ -3,6 +3,7 @@
 ####
 raw_command = 'python benchmark_exp/Run_Detector_M.py --AD_Name PCA --postfix test --overwrite'
 raw_command_SpikeCNN = 'python benchmark_exp/Run_Detector_M.py --AD_Name SpikeCNN --Encoder_Name dynamic_receptive --verbose --save --postfix dr_test --overwrite --adaptation --sensitization --integration sum'
+raw_command_ParallelSNN = 'python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --postfix test --overwrite --save'
 param_set_test = [
     # CNN
     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv', '--save', '--AD_Name', 'CNN', '--postfix', 'test'],
@@ -908,4 +909,14 @@ param_set_20_10 = [
     # OXOO+BF+TC+neuron
     ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'SpikeCNN', '--Encoder_Name', 'dynamic_receptive', 
      '--postfix', 's20_full_OXOO-BF-TC-neuron', '--delta_activation', '--learn_threshold', '--reset_mechanism', 'subtract', '--integration', 'concat' , '--num_enc_features', '64', '--activation_type', 'ternary', '--burst', '--dr_granularity', 'neuron'],
+]
+
+####
+# S21: ParallelSNN
+####
+param_set_21 = [
+    ['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Medium-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/medium', '--overwrite', '--save', '--AD_Name', 'ParallelSNN', 
+     '--postfix', 's21_medium_spsn-bn'],
+    #['--file_list', '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv', '--save_dir', '/home/hwkang/dev-TSB-AD/TSB-AD/eval/full', '--overwrite', '--save', '--AD_Name', 'ParallelSNN', 
+    # '--postfix', 's21_full_spsn-noconv'],
 ]

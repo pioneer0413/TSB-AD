@@ -19,6 +19,19 @@ class Chomp2d(nn.Module):
 
     def forward(self, x):
         return x[:, :, :, : -self.chomp_size].contiguous()
+    
+def get_last_number(log_files):
+    max_num = 0
+    if len(log_files) > 0:
+        for file in log_files:
+            segments = file.split('_')
+            file_number = int(segments[0])
+            if file_number > max_num:
+                max_num = file_number
+        file_number = max_num + 1
+    else:
+        file_number = 0
+    return file_number
 
 def loss_visualization(train_loss, valid_loss, save_dir_path='/home/hwkang/dev-TSB-AD/TSB-AD/figures/loss_evolution', TS_Name=None, AD_Name=None, Encoder_Name=None, hyperparameters: list=[]):
     """
@@ -63,7 +76,7 @@ def measure_energy_and_time(function):
         return result, elapsed, energy
     return wrapper
 
-def calculate_output_size(input_size, kernel_size, stride, padding, dilation):
+def calculate_output_size(input_size, kernel_size, stride=1, padding=0, dilation=1):
     """
     Calculate the output size of a convolutional layer.
     

@@ -10,63 +10,43 @@ from cleverhans.torch.attacks.fast_gradient_method import fast_gradient_method
 from cleverhans.torch.attacks.projected_gradient_descent import projected_gradient_descent
 
 class BaseModule():
-    def __init__(self,
-                 TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
-                 batch_size=128, epochs=50, validation_size=0.2, # 훈련 루프 하이퍼파라미터
-                 window_size=100, num_channel=[32, 40], lr=0.0008, # 학습 하이퍼파라미터
-                 num_raw_features=1,
-                 pred_len=1,
-                 local_running_params=None): # 미지정 하이퍼파라미터
+    def __init__(self, TS_Name, num_raw_features, local_running_params): # 미지정 하이퍼파라미터
 
         self.local_running_params = local_running_params
 
         self.__anomaly_score = None
         self.y_hats = None
 
-        # GPU/CPU 설정
-        cuda = True
-        self.cuda = cuda
-        self.device = get_gpu(self.cuda) if local_running_params['off_cuda'] == False else torch.device('cpu')
-
         # 메타 데이터
         self.TS_Name = TS_Name
-        self.AD_Name = AD_Name
-        self.Encoder_Name = Encoder_Name
-        self.postfix = local_running_params['postfix']
-        self.id_code = local_running_params['id_code']
+        self.AD_Name = self.local_running_params['meta']['AD_Name']
+        self.Encoder_Name = self.local_running_params['meta']['Encoder_Name']
+        self.postfix = self.local_running_params['meta']['postfix']
+        self.id_code = self.local_running_params['meta']['id_code']
 
-        if self.AD_Name == 'SpikeCNN':
-            # 훈련 루프 하이퍼파라미터
-            self.batch_size = self.local_running_params['batch_size']
-            self.epochs = self.local_running_params['epochs']
-            self.validation_size = self.local_running_params['validation_size']
-            self.window_size = self.local_running_params['window_size'] # 학습 하이퍼파라미터
-            self.num_raw_features = num_raw_features # Features 지정 하이퍼파라미터
-            self.pred_len = self.local_running_params['predict_time_steps'] # 미지정 하이퍼파라미터
-        else:
-            self.batch_size = batch_size
-            self.epochs = epochs
-            self.validation_size = validation_size
-            self.window_size = window_size
-            self.num_channel = num_channel
-            self.lr = lr
-            self.num_raw_features = num_raw_features
-            self.pred_len = pred_len
+        # 모델 공통
+        self.num_raw_features = num_raw_features
+        self.device_type = self.local_running_params['model']['device_type']
+        self.batch_size = self.local_running_params['model']['batch_size']
+        self.epochs = self.local_running_params['model']['max_epochs']
+        self.validation_size = self.local_running_params['model']['validation_size']
+        self.window_size = self.local_running_params['model']['window_size']
+        self.predict_time_steps = self.local_running_params['model']['predict_time_steps']
 
-        # 적대적 공격
-        self.adversarial = self.local_running_params['adversarial']
-        
+        # GPU/CPU 설정
+        self.device = get_gpu(True) if self.device_type == 'cuda' and torch.cuda.is_available() else torch.device('cpu')
+
+        # 모델 저장 및 로드 경로 설정 (Not in use)      
         self.root_dir_path = '/home/hwkang/dev-TSB-AD/TSB-AD/'
         self.save_path = os.path.join(self.root_dir_path, 'weights')
         os.makedirs(self.save_path, exist_ok=True)
-        self.early_stopping = EarlyStoppingTorch(save_path=self.save_path, patience=3, filename=local_running_params['save_file_path'])
 
     def fit(self, data):
         raise NotImplementedError("fit method not implemented")
 
     def decision_function(self, data):
         test_loader = DataLoader(
-            ForecastDataset(data, window_size=self.window_size, pred_len=self.pred_len),
+            ForecastDataset(data, window_size=self.window_size, pred_len=self.predict_time_steps),
             batch_size=self.batch_size,
             shuffle=False
         )
@@ -79,16 +59,10 @@ class BaseModule():
             for idx, (x, target) in loop:
                 x, target = x.to(self.device), target.to(self.device)
 
-                with torch.enable_grad():
-                    if self.adversarial['type'] == 'fgsm':
-                        x = fast_gradient_method(self.model, x, self.adversarial['fgsm']['eps'], self.adversarial['fgsm']['norm'])
-                    elif self.adversarial['type'] == 'pgd':
-                        x = projected_gradient_descent(self.model, x, self.adversarial['pgd']['eps'], self.adversarial['pgd']['eps_iter'], self.adversarial['pgd']['nb_iter'], self.adversarial['pgd']['norm'])
-
                 output = self.model(x)
                 
-                output = output.view(-1, self.num_raw_features*self.pred_len)
-                target = target.view(-1, self.num_raw_features*self.pred_len)
+                output = output.view(-1, self.num_raw_features*self.predict_time_steps)
+                target = target.view(-1, self.num_raw_features*self.predict_time_steps)
                 
                 mse = torch.sub(output, target).pow(2)
 
@@ -108,12 +82,11 @@ class BaseModule():
 
         assert scores.ndim == 1
         
-        if self.local_running_params['verbose']:
-            print('scores: ', scores.shape) 
+        print('scores: ', scores.shape) 
         if scores.shape[0] < len(data):
             padded_decision_scores_ = np.zeros(len(data))
-            padded_decision_scores_[: self.window_size+self.pred_len-1] = scores[0]
-            padded_decision_scores_[self.window_size+self.pred_len-1 : ] = scores
+            padded_decision_scores_[: self.window_size+self.predict_time_steps-1] = scores[0]
+            padded_decision_scores_[self.window_size+self.predict_time_steps-1 : ] = scores
 
         self.__anomaly_score = padded_decision_scores_
         return padded_decision_scores_

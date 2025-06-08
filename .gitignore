@@ -12,3 +12,7 @@ logs/
 weights/
 TSB_AD/snn/tests
 Datasets/TSB-AD-M
+results/
+scores/
+wandb/
+analyses/MNIST/

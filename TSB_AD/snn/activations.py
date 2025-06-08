@@ -4,6 +4,7 @@ from torch.nn import functional as F
 
 import snntorch as snn
 from snntorch import surrogate
+from spikingjelly.activation_based import neuron
 
 import math
 
@@ -226,6 +227,16 @@ class DynamicReceptiveSpikeActivation(BaseSpikeActivation):
         self.f_lif.threshold = self.base_thr_f
         self.n_lif.threshold = self.base_thr_n
 
+class PSNActivation(BaseSpikeActivation):
+    def __init__(self, local_running_params, num_features, ndim=3, layer_type='core'):
+        super(PSNActivation, self).__init__(local_running_params=local_running_params, num_features=num_features, ndim=ndim, layer_type=layer_type)
+        
+        self.lif = neuron.PSN()
+
+    def forward(self, activations):
+        pass
+
+
 class SpikeActivation(BaseSpikeActivation):
     def __init__(self, local_running_params, num_features, ndim=3, layer_type='core'):
         super(SpikeActivation, self).__init__(local_running_params, num_features, ndim, layer_type)
@@ -424,10 +435,7 @@ class TernarySpikeActivation(BaseSpikeActivation):
         
 
 if __name__ == "__main__":
-
-    from params import running_params
-    t_lif = TernarySpikeActivation(local_running_params=running_params)
-    inputs = torch.randn(1, 2, 10) # (B, C, L)
-    outputs = t_lif(inputs)
     
-    print(outputs)
+    # print spikingjelly version from pip
+    from importlib.metadata import version
+    print("spikingjelly version:", version("spikingjelly"))
