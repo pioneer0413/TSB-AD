@@ -12,7 +12,10 @@ logs/
 weights/
 TSB_AD/snn/tests
 Datasets/TSB-AD-M
+Datasets/TSB-AD-U
 results/
 scores/
 wandb/
 analyses/MNIST/
+analyses/izhikevich/
+analyses/leaderboard/

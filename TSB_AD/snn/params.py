@@ -2,9 +2,9 @@ running_params = {
 
     'data': {
         'dataset_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/TSB-AD-M',
-        'file_list': '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Eva.csv',
+        'file_list': '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-PW-Eva.csv',
         'score_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/scores',
-        'result_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/results/full/',
+        'result_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/results/pw/',
         'swap': False,
         'shuffle': False,
     },
@@ -26,7 +26,7 @@ running_params = {
 
     'model': {
         'device_type': 'cuda',
-        'batch_size': 256,
+        'batch_size': 128,
         'max_epochs': 1000,
         'validation_size': 0.2,
         'window_size': 50,
@@ -36,8 +36,13 @@ running_params = {
     'ParallelSNNModel': {
         'num_enc_features': 32,
         'norm_type': 'ln',
+        'dropout': False,
         'neuron_type': 'spikingjelly',
         'step_mode': 'm',
-        'encoding_kernel': [7, 3, 5],
+        'encoding_kernel': [5, 11, 5],
+        'tt': False, # Temporal Trheshold
+        'delta_abs': False,
+        'grad_spike': False,
+        'parallel': False,
     },
 }

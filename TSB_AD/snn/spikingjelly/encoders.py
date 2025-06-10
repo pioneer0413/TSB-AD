@@ -45,9 +45,9 @@ class RepeatEncoder(BaseEncoder):
             return spks
         
 class DeltaEncoder(BaseEncoder):
-    def __init__(self, local_running_params, output_size: int, neuron_type: str = 'spikingjelly'):
+    def __init__(self, local_running_params, num_raw_features, output_size: int, neuron_type: str = 'spikingjelly'):
         super().__init__(local_running_params)
-        self.norm = nn.BatchNorm2d(1)
+        self.norm = nn.BatchNorm2d(1) if local_running_params['ParallelSNNModel']['norm_type'] == 'bn' else nn.LayerNorm((1, num_raw_features, local_running_params['model']['window_size']))
         self.enc = nn.Linear(1, output_size)
         self.neuron_type = neuron_type
         if neuron_type == 'spikingjelly':
@@ -132,34 +132,36 @@ class DynamicReceptiveEncoder(BaseEncoder):
         else:
             self.norm = nn.LayerNorm((num_enc_features, local_running_params['model']['window_size']))
 
+        self.dropout = nn.Dropout1d(p=0.5)
+
         # S-LIF
         self.s_lif = neuron.SlidingPSN(
             k=self.local_running_params['ParallelSNNModel']['encoding_kernel'][0],
             step_mode='m' if self.local_running_params['ParallelSNNModel']['step_mode'] == 'm' else 's',
             backend='conv',
         )
-        self.s_lif.bias = nn.Parameter(
-            torch.as_tensor(-0.5)
-        )
-        self.adapt_rate = 0.5
-
+        
         # F-LIF
         self.f_lif = neuron.SlidingPSN(
             k=self.local_running_params['ParallelSNNModel']['encoding_kernel'][1],
             step_mode='m' if self.local_running_params['ParallelSNNModel']['step_mode'] == 'm' else 's',
             backend='conv',
         )
-
         # N-LIF
         self.n_lif = neuron.SlidingPSN(
             k=self.local_running_params['ParallelSNNModel']['encoding_kernel'][2],
             step_mode='m' if self.local_running_params['ParallelSNNModel']['step_mode'] == 'm' else 's',
             backend='conv',
         )
-        self.n_lif.bias = nn.Parameter(
-            torch.as_tensor(-2.0)
-        )
-        self.sensitize_rate = 0.5
+
+        if self.local_running_params['ParallelSNNModel']['tt']:
+            self.s_lif.bias = nn.Parameter(-0.5*torch.ones(self.local_running_params['model']['window_size']).view(self.local_running_params['model']['window_size'], 1, 1))
+            self.f_lif.bias = nn.Parameter(-1.0*torch.ones(self.local_running_params['model']['window_size']).view(self.local_running_params['model']['window_size'], 1, 1))
+            self.n_lif.bias = nn.Parameter(-2.0*torch.ones(self.local_running_params['model']['window_size']).view(self.local_running_params['model']['window_size'], 1, 1))
+        else:
+            self.s_lif.bias = nn.Parameter(torch.as_tensor(-0.5))
+            self.f_lif.bias = nn.Parameter(torch.as_tensor(-1.0))
+            self.n_lif.bias = nn.Parameter(torch.as_tensor(-2.0))
 
         # Conv2d for graded spike
         self.conv2d = nn.Conv2d(
@@ -172,55 +174,31 @@ class DynamicReceptiveEncoder(BaseEncoder):
         # IN: B, L, C
         inputs = inputs.permute(0, 2, 1) # B, C, L <
         activations = self.transducer(inputs) # B, E, L <
-        x = activations = self.norm(activations)
+        activations = self.norm(activations)
+
+        if self.local_running_params['ParallelSNNModel']['dropout']:
+            activations = self.dropout(activations)  # B, E, L <
+            #print(f"After dropout: {activations.shape}")
 
         delta_activations = torch.zeros_like(activations)
         delta_activations[:, :, 1:] = activations[:, :, 1:] - activations[:, :, :-1] # B, E, L-1 <
         delta_activations[:, :, 0] = 0.0
-        
-        if self.local_running_params['ParallelSNNModel']['step_mode'] == 'm':
-            # S-LIF
-            s_lif_out = self.s_lif(activations.permute(2, 0, 1)).permute(1, 2, 0)  # L, B, E < L, B, E
-            # F-LIF
-            f_lif_out = self.f_lif(delta_activations.permute(2, 0, 1)).permute(1, 2, 0)
-            # N-LIF
-            n_lif_out = self.n_lif(activations.permute(2, 0, 1)).permute(1, 2, 0) # L, B, E < L, B, E
-        else:
-            num_steps = activations.size(2)
-            shape = activations.shape
-            activations = activations.reshape(shape[2], shape[0], shape[1])  # L, B, E <
-            delta_activations = delta_activations.reshape(shape[2], shape[0], shape[1])  # L, B, E <
-            temp_s_lif_out = []
-            temp_f_lif_out = []
-            temp_n_lif_out = []
-            prev_s_lif_out = torch.zeros_like(activations[0])  # B, E
-            #prev_f_lif_out = torch.zeros_like(delta_activations[0])
-            prev_n_lif_out = torch.zeros_like(activations[0])
-            for step in range(num_steps):
-                # S-LIF
-                s_lif_out = self.s_lif(activations[step] - prev_s_lif_out * self.adapt_rate)
-                temp_s_lif_out.append(s_lif_out)
-                prev_s_lif_out = s_lif_out
-                
-                # F-LIF
-                f_lif_out = self.f_lif(delta_activations[step])
-                temp_f_lif_out.append(f_lif_out)
-                #prev_f_lif_out = f_lif_out
-                
-                # N-LIF
-                n_lif_out = self.n_lif(activations[step] + prev_n_lif_out * self.sensitize_rate)
-                temp_n_lif_out.append(n_lif_out)
-                prev_n_lif_out = n_lif_out
 
-            s_lif_out = torch.stack(temp_s_lif_out, dim=0).permute(1, 2, 0)  # B, E, L < L, B, E
-            f_lif_out = torch.stack(temp_f_lif_out, dim=0).permute(1, 2, 0)
-            n_lif_out = torch.stack(temp_n_lif_out, dim=0).permute(1, 2, 0)
+        if self.local_running_params['ParallelSNNModel']['delta_abs']:
+            delta_activations = torch.abs(delta_activations)
+
+        # F-LIF
+        f_lif_out = self.f_lif(delta_activations.permute(2, 0, 1)).permute(1, 2, 0)
+        # S-LIF
+        s_lif_out = self.s_lif(activations.permute(2, 0, 1)).permute(1, 2, 0)  # L, B, E < L, B, E
+        # N-LIF
+        n_lif_out = self.n_lif(activations.permute(2, 0, 1)).permute(1, 2, 0) # L, B, E < L, B, E
                 
         lif_out = torch.stack([s_lif_out, f_lif_out, n_lif_out], dim=1)  # B, 3, E, L
-        #lif_out = lif_out.sum(dim=1).unsqueeze(1)  # B, 1, E, L
 
-        lif_out = self.conv2d(lif_out)  # B, 1, E, L
-
-        #lif_out = lif_out + activations.unsqueeze(1) + delta_activations.unsqueeze(1) # B, 1, E, L <
+        if self.local_running_params['ParallelSNNModel']['grad_spike']:
+            lif_out = self.conv2d(lif_out)  # B, 1, E, L
+        else:
+            lif_out = lif_out.sum(dim=1).unsqueeze(1)  # B, 1, E, L
 
         return lif_out # B, 1, E, L <

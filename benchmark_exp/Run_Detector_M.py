@@ -28,11 +28,11 @@ print("CUDA available: ", torch.cuda.is_available())
 print("cuDNN version: ", torch.backends.cudnn.version())
 
 '''
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name receptive
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name conv
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name delta
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name repeat
-python benchmark_exp/Run_Detector_M.py --AD_Name CNN
+python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name receptive --postfix
+python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name conv --postfix
+python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name delta --postfix
+python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name repeat --postfix
+python benchmark_exp/Run_Detector_M.py --AD_Name CNN --postfix
 '''
 
 if __name__ == '__main__':
@@ -52,11 +52,17 @@ if __name__ == '__main__':
 
     # model-common
     parser.add_argument('--device_type', type=str, default='cuda', choices=['cpu', 'cuda'])
+    parser.add_argument('--batch_size', type=int, default=running_params['model']['batch_size'])
     parser.add_argument('--window_size', type=int, default=running_params['model']['window_size'])
 
     # model-specific(ParallelSNN)
     parser.add_argument('--num_enc_features', type=int, default=int(running_params['ParallelSNNModel']['num_enc_features']))
     parser.add_argument('--norm_type', type=str, default=running_params['ParallelSNNModel']['norm_type'], choices=['bn', 'ln'])
+    parser.add_argument('--dropout', action='store_true', default=running_params['ParallelSNNModel']['dropout'])
+    parser.add_argument('--encoding_kernel', type=str, default='5n11n5', help='Format: "5n11n5" for [5, 11, 5]')
+    parser.add_argument('--tt', action='store_true', default=running_params['ParallelSNNModel']['tt'])
+    parser.add_argument('--delta_abs', action='store_true', default=running_params['ParallelSNNModel']['delta_abs'])
+    parser.add_argument('--grad_spike', action='store_true', default=running_params['ParallelSNNModel']['grad_spike'])
 
     args = parser.parse_args()
 
@@ -66,13 +72,23 @@ if __name__ == '__main__':
     # Data
     local_running_params['data']['swap'] = args.channel_swap
     local_running_params['data']['shuffle'] = args.channel_shuffle
-
     # Metadata
     local_running_params['meta']['AD_Name'] = args.AD_Name
     local_running_params['meta']['Encoder_Name'] = args.Encoder_Name
     local_running_params['meta']['postfix'] = args.postfix
-    # HP
+    # model-common
+    local_running_params['model']['device_type'] = args.device_type
+    local_running_params['model']['batch_size'] = args.batch_size
+    local_running_params['model']['window_size'] = args.window_size
+    # model-specific
     local_running_params['ParallelSNNModel']['num_enc_features'] = args.num_enc_features
+    local_running_params['ParallelSNNModel']['norm_type'] = args.norm_type
+    local_running_params['ParallelSNNModel']['dropout'] = args.dropout
+    local_running_params['ParallelSNNModel']['encoding_kernel'] = [int(x) for x in args.encoding_kernel.split('n')]
+    local_running_params['ParallelSNNModel']['tt'] = args.tt
+    local_running_params['ParallelSNNModel']['delta_abs'] = args.delta_abs
+    local_running_params['ParallelSNNModel']['grad_spike'] = args.grad_spike
+
     # 로그 파일 경로 설정
     log_dir_path = os.path.join(local_running_params['meta']['root_dir_path'], 'logs')
     id_code = get_last_number(os.listdir(log_dir_path))
@@ -89,6 +105,14 @@ if __name__ == '__main__':
         # 실행 시작 시점 기록
         f.write('\n')
         f.write('Execution Start Time: {}\n'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+
+    # Check whether parameters are same as intended
+    # get standard input from console
+    # if input is 'y' or 'enter', continue the execution else remove log file and exit
+    if input("Are the parameters correct? ([y]/n): ").strip().lower() not in ['y', '']:
+        print("Parameters are not correct. Exiting...")
+        os.remove(log_file_path)
+        exit()
 
     file_list = pd.read_csv(local_running_params['data']['file_list'])['file_name'].values
     Optimal_Det_HP = Optimal_Multi_algo_HP_dict[args.AD_Name]

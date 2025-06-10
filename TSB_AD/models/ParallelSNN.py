@@ -53,7 +53,7 @@ class ParallelSNNModel(nn.Module):
         elif self.local_running_params['meta']['Encoder_Name'] == 'repeat':
             self.encoder = RepeatEncoder(local_running_params, output_size=self.num_enc_features, neuron_type=self.local_running_params['ParallelSNNModel']['neuron_type'])
         elif self.local_running_params['meta']['Encoder_Name'] == 'delta':
-            self.encoder = DeltaEncoder(local_running_params, output_size=self.num_enc_features, neuron_type=self.local_running_params['ParallelSNNModel']['neuron_type'])
+            self.encoder = DeltaEncoder(local_running_params, num_raw_features=num_raw_features, output_size=self.num_enc_features, neuron_type=self.local_running_params['ParallelSNNModel']['neuron_type'])
         elif self.local_running_params['meta']['Encoder_Name'] == 'conv':
             self.encoder = ConvEncoder(local_running_params, output_size=self.num_enc_features, neuron_type=self.local_running_params['ParallelSNNModel']['neuron_type'])
         else:
