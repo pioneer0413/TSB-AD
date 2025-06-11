@@ -64,6 +64,9 @@ if __name__ == '__main__':
     parser.add_argument('--delta_abs', action='store_true', default=running_params['ParallelSNNModel']['delta_abs'])
     parser.add_argument('--grad_spike', action='store_true', default=running_params['ParallelSNNModel']['grad_spike'])
 
+    # check skip
+    parser.add_argument('--skip', action='store_true', default=False, help='Skip the confirmation of parameters before running the detector.')
+
     args = parser.parse_args()
 
     # Reset Independent Variable of running_params
@@ -109,10 +112,11 @@ if __name__ == '__main__':
     # Check whether parameters are same as intended
     # get standard input from console
     # if input is 'y' or 'enter', continue the execution else remove log file and exit
-    if input("Are the parameters correct? ([y]/n): ").strip().lower() not in ['y', '']:
-        print("Parameters are not correct. Exiting...")
-        os.remove(log_file_path)
-        exit()
+    if args.skip is False:
+        if input("Are the parameters correct? ([y]/n): ").strip().lower() not in ['y', '']:
+            print("Parameters are not correct. Exiting...")
+            os.remove(log_file_path)
+            exit()
 
     file_list = pd.read_csv(local_running_params['data']['file_list'])['file_name'].values
     Optimal_Det_HP = Optimal_Multi_algo_HP_dict[args.AD_Name]
