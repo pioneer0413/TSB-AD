@@ -15,7 +15,7 @@ from spikingjelly.activation_based import neuron, functional, monitor
 import snntorch as snn
 from snntorch import utils
 from snntorch.functional import probe
-from TSB_AD.snn.spikingjelly.encoders import RepeatEncoder, DeltaEncoder, ConvEncoder, DynamicReceptiveEncoder
+from TSB_AD.snn.spikingjelly.encoders import RepeatEncoder, DeltaEncoder, ConvEncoder, ReceptiveEncoder, DynamicReceptiveEncoder
 import wandb
 
 class AdaptiveConcatPool1d(nn.Module):
@@ -49,26 +49,28 @@ class ParallelSNNModel(nn.Module):
 
         # Block 0: Encoder
         if self.local_running_params['meta']['Encoder_Name'] == 'receptive':
-            self.encoder = DynamicReceptiveEncoder(local_running_params, self.num_raw_features, self.num_enc_features)
+            self.encoder = ReceptiveEncoder(local_running_params, self.num_raw_features, self.num_enc_features)
         elif self.local_running_params['meta']['Encoder_Name'] == 'repeat':
             self.encoder = RepeatEncoder(local_running_params, output_size=self.num_enc_features, neuron_type=self.local_running_params['ParallelSNNModel']['neuron_type'])
         elif self.local_running_params['meta']['Encoder_Name'] == 'delta':
             self.encoder = DeltaEncoder(local_running_params, num_raw_features=num_raw_features, output_size=self.num_enc_features, neuron_type=self.local_running_params['ParallelSNNModel']['neuron_type'])
         elif self.local_running_params['meta']['Encoder_Name'] == 'conv':
             self.encoder = ConvEncoder(local_running_params, output_size=self.num_enc_features, neuron_type=self.local_running_params['ParallelSNNModel']['neuron_type'])
+        elif self.local_running_params['meta']['Encoder_Name'] == 'dynamic':
+            self.encoder = DynamicReceptiveEncoder(local_running_params, num_raw_features=self.num_raw_features, num_enc_features=self.num_enc_features)
         else:
             raise ValueError(f"Unsupported Encoder_Name: {self.local_running_params['meta']['Encoder_Name']}")
 
         # Block 1
         self.blk1_conv = nn.Conv1d(self.num_enc_features * 1 if self.local_running_params['meta']['Encoder_Name'] == 'receptive' else self.num_enc_features * self.num_raw_features, 
                                    32, kernel_size=self.kernel_size, stride=1, padding=self.kernel_size // 2)
-        self.blk1_bn = nn.BatchNorm1d(32)
+        #self.blk1_bn = nn.BatchNorm1d(32)
         self.blk1_psn = neuron.SlidingPSN(k=3, step_mode='m', backend='conv')
         self.blk1_mp = nn.MaxPool1d(kernel_size=2)
 
         # Block 2
         self.blk2_conv = nn.Conv1d(32, 40, kernel_size=self.kernel_size, stride=1, padding=self.kernel_size // 2)
-        self.blk2_bn = nn.BatchNorm1d(40)
+        #self.blk2_bn = nn.BatchNorm1d(40)
         self.blk2_psn = neuron.SlidingPSN(k=3, step_mode='m', backend='conv')
         self.blk2_mp = nn.MaxPool1d(kernel_size=2)
 
@@ -92,13 +94,13 @@ class ParallelSNNModel(nn.Module):
 
         # Block 1
         activations_1 = self.blk1_conv(encodings.reshape(encodings_shape[0], encodings_shape[1]*encodings_shape[2], encodings_shape[3])) # (B, 32, L) < (B, E*C, L)
-        activations_1 = self.blk1_bn(activations_1) 
+        #activations_1 = self.blk1_bn(activations_1) 
         spikes_1 = self.blk1_psn(activations_1)
         spikes_1 = self.blk1_mp(spikes_1)  # (B, 32, L/2) <
 
         # Block 2
         activations_2 = self.blk2_conv(spikes_1)  # (B, 40, L/2) <
-        activations_2 = self.blk2_bn(activations_2)
+        #activations_2 = self.blk2_bn(activations_2)
         spikes_2 = self.blk2_psn(activations_2)
         spikes_2 = self.blk2_mp(spikes_2)  # (B, 40, L/4) <
         
@@ -143,8 +145,9 @@ class ParallelSNN(Base.BaseModule):
 
         # Monitor
         if self.local_running_params['ParallelSNNModel']['neuron_type'] == 'spikingjelly':
-            self.spikerate_monitor = monitor.OutputMonitor(net=self.model, instance=(neuron.LIFNode, neuron.SlidingPSN), function_on_output=lambda x: x.mean())
-            self.spike_monitor = monitor.OutputMonitor(net=self.model, instance=(neuron.LIFNode, neuron.SlidingPSN))
+            pass
+            #self.spikerate_monitor = monitor.OutputMonitor(net=self.model, instance=(neuron.LIFNode, neuron.SlidingPSN), function_on_output=lambda x: x.mean())
+            #self.spike_monitor = monitor.OutputMonitor(net=self.model, instance=(neuron.LIFNode, neuron.SlidingPSN))
         else:
             self.spikerate_monitor = probe.OutputMonitor(net=self.model, instance=snn.Leaky, function_on_output=lambda x: x.mean())
 
@@ -191,8 +194,8 @@ class ParallelSNN(Base.BaseModule):
             self.model.train(mode=True)
             avg_loss = 0
             loop = tqdm.tqdm(enumerate(train_loader),total=len(train_loader),leave=True)
-            self.spikerate_monitor.disable()  # Disable spike monitor for training
-            self.spike_monitor.disable()  # Disable spike monitor for training
+            '''self.spikerate_monitor.disable()  # Disable spike monitor for training
+            self.spike_monitor.disable()  # Disable spike monitor for training'''
             for idx, (x, target) in loop:
                 x, target = x.to(self.device), target.to(self.device)
 
@@ -217,15 +220,16 @@ class ParallelSNN(Base.BaseModule):
             scores = []
             avg_loss = 0
             loop = tqdm.tqdm(enumerate(valid_loader),total=len(valid_loader),leave=True)
-            self.spikerate_monitor.enable()
+            '''self.spikerate_monitor.enable()'''
             with torch.no_grad():
                 for idx, (x, target) in loop:
                     x, target = x.to(self.device), target.to(self.device)
-                    if idx == 0:
+
+                    '''if idx == 0:
                         self.spike_monitor.enable()
                         x_copy = x.clone() # first batch for spike monitor
                     else:
-                        self.spike_monitor.disable()
+                        self.spike_monitor.disable()'''
                     
                     output = self.model(x)
                     
@@ -263,6 +267,7 @@ class ParallelSNN(Base.BaseModule):
                     'valid_loss': valid_loss,
                 })        
 
+        '''
         train_loss_rec = np.array(train_loss_rec)
         valid_loss_rec = np.array(valid_loss_rec)
         np.save(os.path.join(self.loss_dir_path, f'{self.base_name}_train.npy'), train_loss_rec)
@@ -309,3 +314,4 @@ class ParallelSNN(Base.BaseModule):
 
                 raw_data = x_copy.permute(0, 2, 1).cpu().numpy() # (B, L, C)
                 np.save(os.path.join(self.spike_dir_path, f'{self.base_name}_raw.npy'), raw_data)
+        '''

@@ -28,6 +28,7 @@ print("CUDA available: ", torch.cuda.is_available())
 print("cuDNN version: ", torch.backends.cudnn.version())
 
 '''
+python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name dynamic --postfix
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name receptive --postfix
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name conv --postfix
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name delta --postfix
@@ -42,12 +43,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generating Anomaly Score')
 
     # data
+    parser.add_argument('--dataset_name', type=str, default='Tiny')
     parser.add_argument('--channel_swap', action='store_true', default=running_params['data']['swap'])
     parser.add_argument('--channel_shuffle', action='store_true', default=running_params['data']['shuffle'])
 
     # meta
     parser.add_argument('--AD_Name', type=str, required=True)
-    parser.add_argument('--Encoder_Name', type=str, default=None, choices=['conv', 'repeat', 'delta', 'receptive', 'receptive2', 'gac'])
+    parser.add_argument('--Encoder_Name', type=str, default=None, choices=['conv', 'repeat', 'delta', 'receptive', 'dynamic'])
     parser.add_argument('--postfix', type=str, default='None')
 
     # model-common
@@ -73,6 +75,18 @@ if __name__ == '__main__':
     local_running_params = running_params.copy()
 
     # Data
+    file_list = local_running_params['data']['file_list']
+    src_file_name = file_list.split('/')[-1]
+    target_file_name = f'TSB-AD-M-{args.dataset_name}-Eva.csv'
+    file_list = file_list.replace(src_file_name, target_file_name)
+    local_running_params['data']['file_list'] = file_list
+
+    result_dir = local_running_params['data']['result_dir']
+    src_name = result_dir.split('/')[-1]
+    lower_name = args.dataset_name.lower()
+    result_dir = result_dir.replace(src_name, lower_name)
+    local_running_params['data']['result_dir'] = result_dir
+
     local_running_params['data']['swap'] = args.channel_swap
     local_running_params['data']['shuffle'] = args.channel_shuffle
     # Metadata
@@ -126,6 +140,10 @@ if __name__ == '__main__':
         
         file_path = os.path.join(local_running_params['data']['dataset_dir'], filename)
         df = pd.read_csv(file_path).dropna()
+
+        if local_running_params['data']['normalize']:
+            # channel-wise normalization
+            df.iloc[:, :-1] = (df.iloc[:, :-1] - df.iloc[:, :-1].mean()) / df.iloc[:, :-1].std()
 
         assert not (local_running_params['data']['swap'] is True and local_running_params['data']['shuffle'] is True), "'swap' cannot co-exist with 'shuffle'."
 

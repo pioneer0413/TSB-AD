@@ -2,11 +2,12 @@ running_params = {
 
     'data': {
         'dataset_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/TSB-AD-M',
-        'file_list': '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-SVDB-Eva.csv',
+        'file_list': '/home/hwkang/dev-TSB-AD/TSB-AD/Datasets/File_List/TSB-AD-M-Tiny-Eva.csv',
         'score_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/scores',
-        'result_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/results/svdb/',
+        'result_dir': '/home/hwkang/dev-TSB-AD/TSB-AD/results/tiny',
         'swap': False,
         'shuffle': False,
+        'normalize': False,
     },
 
     'meta': {
