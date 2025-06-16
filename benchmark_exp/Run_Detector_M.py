@@ -12,6 +12,10 @@ from TSB_AD.model_wrapper import *
 from TSB_AD.HP_list import Optimal_Multi_algo_HP_dict
 from TSB_AD.snn.params import running_params
 from TSB_AD.snn.utils import get_last_number
+from sklearn.decomposition import PCA, KernelPCA
+from sklearn.cluster import KMeans
+from hummingbird.ml import convert
+from TSB_AD.utils.torch_utility import get_gpu
 
 # seeding
 seed = 2024
@@ -32,8 +36,9 @@ python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name dyna
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name receptive --postfix
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name conv --postfix
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name delta --postfix
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name repeat --postfix
+python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name repeat --num_enc_features 1 --dataset_name GHL --batch_size 256 --postfix enc_features_1
 python benchmark_exp/Run_Detector_M.py --AD_Name CNN --postfix
+python benchmark_exp/Run_Detector_M.py --AD_Name SEWResNet --Encoder_Name conv --postfix
 '''
 
 if __name__ == '__main__':
@@ -46,6 +51,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_name', type=str, default='Tiny')
     parser.add_argument('--channel_swap', action='store_true', default=running_params['data']['swap'])
     parser.add_argument('--channel_shuffle', action='store_true', default=running_params['data']['shuffle'])
+    parser.add_argument('--normalize', action='store_true', default=running_params['data']['normalize'], help='Apply channel-wise normalization.')
+    parser.add_argument('--drop', action='store_true', default=running_params['data']['drop'], help='Apply PCA to drop less important channels.')
 
     # meta
     parser.add_argument('--AD_Name', type=str, required=True)
@@ -61,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_enc_features', type=int, default=int(running_params['ParallelSNNModel']['num_enc_features']))
     parser.add_argument('--norm_type', type=str, default=running_params['ParallelSNNModel']['norm_type'], choices=['bn', 'ln'])
     parser.add_argument('--dropout', action='store_true', default=running_params['ParallelSNNModel']['dropout'])
-    parser.add_argument('--encoding_kernel', type=str, default='5n11n5', help='Format: "5n11n5" for [5, 11, 5]')
+    parser.add_argument('--encoding_kernel', type=str, default='3n3n3', help='Format: "5n11n5" for [5, 11, 5]')
     parser.add_argument('--tt', action='store_true', default=running_params['ParallelSNNModel']['tt'])
     parser.add_argument('--delta_abs', action='store_true', default=running_params['ParallelSNNModel']['delta_abs'])
     parser.add_argument('--grad_spike', action='store_true', default=running_params['ParallelSNNModel']['grad_spike'])
@@ -89,6 +96,8 @@ if __name__ == '__main__':
 
     local_running_params['data']['swap'] = args.channel_swap
     local_running_params['data']['shuffle'] = args.channel_shuffle
+    local_running_params['data']['normalize'] = args.normalize
+    local_running_params['data']['drop'] = args.drop
     # Metadata
     local_running_params['meta']['AD_Name'] = args.AD_Name
     local_running_params['meta']['Encoder_Name'] = args.Encoder_Name
@@ -143,7 +152,8 @@ if __name__ == '__main__':
 
         if local_running_params['data']['normalize']:
             # channel-wise normalization
-            df.iloc[:, :-1] = (df.iloc[:, :-1] - df.iloc[:, :-1].mean()) / df.iloc[:, :-1].std()
+            df.iloc[:, :-1] = (df.iloc[:, :-1] - df.iloc[:, :-1].mean()) / (df.iloc[:, :-1].std() + 1e-8)
+
 
         assert not (local_running_params['data']['swap'] is True and local_running_params['data']['shuffle'] is True), "'swap' cannot co-exist with 'shuffle'."
 
@@ -175,6 +185,90 @@ if __name__ == '__main__':
             
         data = df.iloc[:, 0:-1].values.astype(float)
         label = df['Label'].astype(int).to_numpy()
+
+        if local_running_params['data']['drop']:
+            # PCA
+            '''
+            C = data.shape[1]
+            variance_threshold = 0.9
+            pca_full = PCA(n_components=C)
+            pca_full.fit(data)
+            # 누적 설명력 계산
+            cumsum = np.cumsum(pca_full.explained_variance_ratio_)
+            k = np.searchsorted(cumsum, variance_threshold) + 1
+
+            # 상위 k개의 PC만 사용
+            components = pca_full.components_[:k, :]                  # shape: (k, C)
+            weights = pca_full.explained_variance_ratio_[:k]          # shape: (k,)
+
+            # 채널별 importance 계산 (가중 합)
+            importance = np.sum(np.abs(components) * weights[:, np.newaxis], axis=0)
+            importance = importance / np.sum(importance)  # normalize to sum = 1
+
+            # KMeans 클러스터링 (2개 클러스터)
+            kmeans = KMeans(n_clusters=2, random_state=0)
+            labels = kmeans.fit_predict(importance.reshape(-1, 1))  # shape: (C,)
+
+            # sort indices
+            indices = np.argsort(importance)[::-1]
+
+            # 가장 중요한 채널이 속한 클러스터의 채널만 선택
+            selected_indices = indices[labels[indices] == labels[indices[0]]]'''
+
+            C = data.shape[1]
+            # Kernel PCA with all C channels
+            kpca = KernelPCA(n_components=C, kernel='rbf', gamma=1.0, fit_inverse_transform=False)
+            kpca.fit(data)
+            kpca_pytorch = convert(kpca, 'torch')
+            device = get_gpu(cuda=True)
+            kpca_pytorch.to(device)
+
+            try:
+                base_transformed = kpca_pytorch.transform(data)
+            except:
+                print("Using sklearn KernelPCA")
+                base_transformed = kpca.transform(data)
+
+            # 중요도 추정: 각 채널의 영향도를 주성분의 projection에서 유도
+            # kpca는 components_가 없음. 대신 eigenvectors_를 이용하거나 transformed 기반으로 channel별 중요도를 유추
+
+            # 대체 방법: 각 채널을 제거해보며 출력 변화량 측정 (approximation)
+            base_var = np.var(base_transformed, axis=0).sum()
+            importances = []
+
+            for c in range(C):
+                masked_data = data.copy()
+                masked_data[:, c] = 0  # 채널 c 제거
+                try:
+                    try:
+                        transformed_masked = kpca_pytorch.transform(masked_data)
+                    except:
+                        print("Using sklearn KernelPCA for masked data")
+                        transformed_masked = kpca.transform(masked_data)
+                    masked_var = np.var(transformed_masked, axis=0).sum()
+                    importance = base_var - masked_var  # 제거 시 variance 감소량
+                except:
+                    importance = 0.0
+                importances.append(importance)
+
+            # cuda cleanup
+            del kpca_pytorch
+            torch.cuda.empty_cache()
+
+            importances = np.array(importances)
+            importances = importances / (np.sum(importances) + 1e-8)  # normalize
+
+            # KMeans 클러스터링
+            kmeans = KMeans(n_clusters=2, random_state=0, n_init=10)
+            labels = kmeans.fit_predict(importances.reshape(-1, 1))  # shape: (C,)
+
+            # 가장 중요한 채널이 속한 클러스터 선택
+            sorted_indices = np.argsort(importances)[::-1]
+            important_label = labels[sorted_indices[0]]
+            selected_indices = np.where(labels == important_label)[0]
+
+            # 선택된 채널만 남기기
+            data = data[:, selected_indices]
 
         feats = data.shape[1]
         slidingWindow = find_length_rank(data[:,0].reshape(-1, 1), rank=1)

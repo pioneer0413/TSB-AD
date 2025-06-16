@@ -62,8 +62,14 @@ class ParallelSNNModel(nn.Module):
             raise ValueError(f"Unsupported Encoder_Name: {self.local_running_params['meta']['Encoder_Name']}")
 
         # Block 1
-        self.blk1_conv = nn.Conv1d(self.num_enc_features * 1 if self.local_running_params['meta']['Encoder_Name'] == 'receptive' else self.num_enc_features * self.num_raw_features, 
-                                   32, kernel_size=self.kernel_size, stride=1, padding=self.kernel_size // 2)
+        if self.local_running_params['meta']['Encoder_Name'] == 'receptive':
+            self.in_channels = self.num_enc_features
+        elif self.local_running_params['meta']['Encoder_Name'] == 'dynamic':
+            self.in_channels = self.num_enc_features * num_raw_features
+        else:
+            self.in_channels = self.num_enc_features * self.num_raw_features
+        self.blk1_conv = nn.Conv1d(in_channels=self.in_channels, out_channels=32,
+                                   kernel_size=self.kernel_size, stride=1, padding=self.kernel_size // 2)
         #self.blk1_bn = nn.BatchNorm1d(32)
         self.blk1_psn = neuron.SlidingPSN(k=3, step_mode='m', backend='conv')
         self.blk1_mp = nn.MaxPool1d(kernel_size=2)
@@ -89,7 +95,6 @@ class ParallelSNNModel(nn.Module):
 
         # Block 0: Encoder
         encodings = self.encoder(inputs) # (B, E, C, L) < (B, L, C)
-
         encodings_shape = encodings.shape
 
         # Block 1
@@ -200,7 +205,7 @@ class ParallelSNN(Base.BaseModule):
                 x, target = x.to(self.device), target.to(self.device)
 
                 self.optimizer.zero_grad()
-
+                #self.model.encoder.reset_adapt()
                 output = self.model(x)
                 output = output.view(-1, self.num_raw_features*self.predict_time_steps)
                 target = target.view(-1, self.num_raw_features*self.predict_time_steps)
@@ -230,7 +235,7 @@ class ParallelSNN(Base.BaseModule):
                         x_copy = x.clone() # first batch for spike monitor
                     else:
                         self.spike_monitor.disable()'''
-                    
+                    #self.model.encoder.reset_adapt()
                     output = self.model(x)
                     
                     output = output.view(-1, self.num_raw_features*self.predict_time_steps)

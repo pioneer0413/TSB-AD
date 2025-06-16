@@ -8,6 +8,7 @@ running_params = {
         'swap': False,
         'shuffle': False,
         'normalize': False,
+        'drop': False,
     },
 
     'meta': {
@@ -27,7 +28,7 @@ running_params = {
 
     'model': {
         'device_type': 'cuda',
-        'batch_size': 32,
+        'batch_size': 256,
         'max_epochs': 1000,
         'validation_size': 0.2,
         'window_size': 50,
@@ -35,14 +36,14 @@ running_params = {
     },
 
     'ParallelSNNModel': {
-        'num_enc_features': 32,
+        'num_enc_features': 8,
         'norm_type': 'ln',
         'dropout': False,
         'neuron_type': 'spikingjelly',
         'step_mode': 'm',
-        'encoding_kernel': [5, 11, 5],
+        'encoding_kernel': [3, 5, 7],
         'tt': False, # Temporal Trheshold
-        'delta_abs': False,
+        'delta_abs': True,
         'grad_spike': False,
         'parallel': False,
     },

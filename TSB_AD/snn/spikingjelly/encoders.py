@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
-from spikingjelly.activation_based import neuron, surrogate, layer
+from spikingjelly.activation_based import neuron, surrogate
 import snntorch as snn
 from snntorch import surrogate as snn_surrogate
 import torch.nn.functional as F
+from sklearn.decomposition import KernelPCA, PCA
+from sklearn.cluster import KMeans
+import numpy as np
 
 tau = 2.0
 backend = "torch"
@@ -172,17 +175,17 @@ class ReceptiveEncoder(BaseEncoder):
             kernel_size=(1, 1)
         )
 
-    def forward(self, inputs: torch.Tensor):
+    def forward(self, inputs: torch.Tensor, vizualize: bool = False):
         # IN: B, L, C
         inputs = inputs.permute(0, 2, 1) # B, C, L <
         activations = self.transducer(inputs) # B, E, L <
-        #activations = self.norm(activations)
+        activations = self.norm(activations)
 
         if self.local_running_params['ParallelSNNModel']['dropout']:
             activations = self.dropout(activations)  # B, E, L <
 
-        delta_activations = torch.zeros_like(activations)
-        delta_activations[:, :, 1:] = activations[:, :, 1:] - activations[:, :, :-1] # B, E, L-1 <
+        delta_activations = torch.zeros_like(activations) # B, E, L <
+        delta_activations[:, :, 1:] = activations[:, :, 1:] - activations[:, :, :-1]
         delta_activations[:, :, 0] = 0.0
 
         if self.local_running_params['ParallelSNNModel']['delta_abs']:
@@ -191,9 +194,9 @@ class ReceptiveEncoder(BaseEncoder):
         # F-LIF
         f_lif_out = self.f_lif(delta_activations.permute(2, 0, 1)).permute(1, 2, 0)
         # S-LIF
-        s_lif_out = self.s_lif(activations.permute(2, 0, 1)).permute(1, 2, 0)  # L, B, E < L, B, E
+        s_lif_out = self.s_lif(activations.permute(2, 0, 1)).permute(1, 2, 0)  # B, E, L < L, B, E
         # N-LIF
-        n_lif_out = self.n_lif(activations.permute(2, 0, 1)).permute(1, 2, 0) # L, B, E < L, B, E
+        n_lif_out = self.n_lif(activations.permute(2, 0, 1)).permute(1, 2, 0) # B, E, L < L, B, E
                 
         lif_out = torch.stack([s_lif_out, f_lif_out, n_lif_out], dim=1)  # B, 3, E, L
 
@@ -202,87 +205,118 @@ class ReceptiveEncoder(BaseEncoder):
         else:
             lif_out = lif_out.sum(dim=1).unsqueeze(1)  # B, 1, E, L
 
+        if vizualize:
+            return lif_out, activations, delta_activations # B, 1, E, L < B, E, L < B, E, L
         return lif_out # B, 1, E, L <
     
 class DynamicReceptiveEncoder(BaseEncoder):
     def __init__(self, local_running_params, num_raw_features, num_enc_features):
         super().__init__(local_running_params)
 
-        kernel_3 = 3
-        kernel_7 = 7
-        self.transducer_3 = nn.Conv2d(
+        self.kernel_size = 3
+        '''self.transducer = nn.Conv2d(
             in_channels=1,
             out_channels=num_enc_features,
-            kernel_size=kernel_3,
+            kernel_size=(1, self.kernel_size),
             stride=1,
-            padding=(kernel_3 // 2, kernel_3 // 2),
-        )
-        self.transducer_7 = nn.Conv2d(
-            in_channels=1,
+            padding=(0, self.kernel_size // 2),
+        )'''
+        self.transducer = nn.Conv1d(
+            in_channels=num_raw_features,
             out_channels=num_enc_features,
-            kernel_size=kernel_7,
+            kernel_size=self.kernel_size,
             stride=1,
-            padding=(kernel_7 // 2, kernel_7 // 2),
+            padding=self.kernel_size // 2,
         )
-        self.norm = nn.LayerNorm((local_running_params['model']['window_size']))
+        self.norm = nn.BatchNorm1d(num_enc_features)
 
         # SA-I
-        self.sa_i = neuron.SimpleLIFNode(tau=20., decay_input=False, v_threshold=1.)
-        # SA-II
-        self.sa_ii = neuron.SimpleLIFNode(tau=50., decay_input=False, v_threshold=1.)
+        #self.sa_i = neuron.SimpleLIFNode(tau=2., decay_input=True)
+        self.sa_i = neuron.SlidingPSN(k=3, step_mode='m', backend='conv')
+        self.sa_i.bias = nn.Parameter(torch.as_tensor(-0.5))  # SlidingPSN bias
+        self.adapt_gain = 1e-5
         # FA-I
-        self.fa_i = neuron.SimpleLIFNode(tau=2., decay_input=False, v_threshold=0.8)
-        # FA-II
-        self.fa_ii = neuron.SimpleLIFNode(tau=0.91, decay_input=False, v_threshold=0.8) # TODO: Izhikevich
-        
+        #self.fa_i = neuron.SimpleLIFNode(tau=2., decay_input=False)
+        self.fa_i = neuron.SlidingPSN(k=3, step_mode='m', backend='conv')
+        self.fa_i.bias = nn.Parameter(torch.as_tensor(-1.0))  # SlidingPSN bias
 
     def forward(self, inputs: torch.Tensor):
         # IN: B, L, C
-        inputs = inputs.permute(0, 2, 1).unsqueeze(1) # B, 1, C, L <
-        activations_3 = self.transducer_3(inputs) # B, E, C, L <
-        activations_7 = self.transducer_7(inputs) # B, E, C, L <
-        #activations = self.norm(activations)
+        #inputs = inputs.permute(0, 2, 1).unsqueeze(1) # B, 1, C, L < B, L, C
+        inputs = inputs.permute(0, 2, 1)  # B, C, L < B, L, C
 
-        delta_activations_3 = torch.zeros_like(activations_3)
-        delta_activations_3[:, :, :, 1:] = activations_3[:, :, :, 1:] - activations_3[:, :, :, :-1]
-        delta_activations_3[:, :, :, 0] = 0.0
-        delta_activations_3 = torch.abs(delta_activations_3)
+        activations = self.transducer(inputs)  # B, E, L < B, C, L
+        activations = self.norm(activations)
+        delta_activations = torch.zeros_like(activations)
+        delta_activations[:, :, 1:] = activations[:, :, 1:] - activations[:, :, :-1]  # B, E, L < B, C, L
+        delta_activations[:, :, 0] = 0.0
+        delta_activations = torch.abs(delta_activations)
 
-        delta_activations_7 = torch.zeros_like(activations_7)
-        delta_activations_7[:, :, :, 1:] = activations_7[:, :, :, 1:] - activations_7[:, :, :, :-1] # B, E, L-1 <
-        delta_activations_7[:, :, :, 0] = 0.0
-        delta_activations_7 = torch.abs(delta_activations_7)
+        sa_i_out = self.sa_i(activations.permute(2, 0, 1))  # L, B, E < B, E, L
+        fa_i_out = self.fa_i(delta_activations.permute(2, 0, 1))  # L, B, E < B, E, L
 
-        activations_3 = activations_3.permute(3, 0, 1, 2)
-        activations_7 = activations_7.permute(3, 0, 1, 2)
-        delta_activations_3 = delta_activations_3.permute(3, 0, 1, 2)
-        delta_activations_7 = delta_activations_7.permute(3, 0, 1, 2)
+        outputs = sa_i_out + fa_i_out
+        outputs = outputs.permute(1, 2, 0).unsqueeze(1)
+        '''
+        cumsum = torch.cumsum(sa_i_out.permute(1,2,3,0), dim=-1)  # B, E, C, L < L, B, E, C
+        adapt = self.sa_i_threshold + self.adapt_gain * cumsum  # B, E, C, L
+        activations = activations - adapt
+        sa_i_out = self.sa_i(activations.permute(3, 0,1,2))  # L, B, E, C < B, E, C, L
+        outputs = sa_i_out + fa_i_out
+        outputs = outputs.permute(1, 2, 3, 0)
+        '''
+        return outputs, activations, delta_activations # B, 1, E, L <
+    
+    def reset_adapt(self):
+        #print(self.adapt_strength)
+        self.adapt_strength = 0.05
+        self.recovery_strength = 0.02
 
-        sa_i_rec = []
-        sa_ii_rec = []
-        fa_i_rec = []
-        fa_ii_rec = []
+    def split_low_high(self, x, cutoff_ratio=0.25):
+        """
+        x : (B, C, L) real tensor
+        cutoff_ratio : 0~1, 비율로 구분 (예: 0.25 → Nyquist의 25% 이하를 저주파로)
+        반환값       : low, high  (둘 다 (B, C, L))
+        """
+        B, C, L = x.shape
+        N_fft   = L // 2 + 1                     # rfft length
+        k_c     = int(cutoff_ratio * (N_fft - 1))
 
-        for step in range(inputs.size(3)):
-            sa_i_out = self.sa_i(activations_3[step])
-            sa_ii_out = self.sa_ii(activations_7[step])
-            fa_i_out = self.fa_i(delta_activations_3[step])
-            fa_ii_out = self.fa_ii(delta_activations_7[step])
+        # 1) FFT
+        Xf = torch.fft.rfft(x, dim=-1)           # (B, C, N_fft), complex64/128
 
-            sa_i_rec.append(sa_i_out)
-            sa_ii_rec.append(sa_ii_out)
-            fa_i_rec.append(fa_i_out)
-            fa_ii_rec.append(fa_ii_out)
-            
-        sa_i_out = torch.stack(sa_i_rec, dim=-1)  # B, E, C, L
-        sa_ii_out = torch.stack(sa_ii_rec, dim=-1) # B, E, C, L
-        fa_i_out = torch.stack(fa_i_rec, dim=-1)
-        fa_ii_out = torch.stack(fa_ii_rec, dim=-1)
+        # 2) 주파수 마스크
+        mask = torch.zeros(N_fft, device=x.device, dtype=torch.bool)
+        mask[:k_c + 1] = True                   # 0~k_c 포함 → low
+        mask_low  = mask
+        mask_high = ~mask
 
-        #print(f"SA-I outputs shape: {sa_i_out.shape}")
+        # broadcast masks to (B,C,N_fft)
+        mask_low  = mask_low.view(1, 1, -1)
+        mask_high = mask_high.view(1, 1, -1)
 
-        outputs = sa_i_out + sa_ii_out + fa_i_out + fa_ii_out # B, E, C, L
+        # 3) 필터링
+        X_low  = Xf * mask_low
+        X_high = Xf * mask_high
 
-        #print(f"DynamicReceptiveEncoder outputs shape: {outputs.shape}")
+        # 4) IFFT
+        x_low  = torch.fft.irfft(X_low,  n=L, dim=-1)   # (B,C,L)
+        x_high = torch.fft.irfft(X_high, n=L, dim=-1)
 
-        return outputs
+        return x_low, x_high
+    
+    def temporal_attention(self, x):
+        # x: (B, L, C)
+        mp = F.adaptive_max_pool1d(x, 1) # (B, L, 1)
+        mp = self.fc1(mp.squeeze(-1))
+        mp = F.relu(mp)
+        mp = self.fc2(mp).unsqueeze(-1)
+        
+        ap = F.adaptive_avg_pool1d(x, 1)
+        ap = self.fc1(ap.squeeze(-1))
+        ap = F.relu(ap)
+        ap = self.fc2(ap).unsqueeze(-1)
+
+        normalized = F.normalize(mp + ap, dim=1)
+        attention = F.softmax(normalized, dim=-1)
+        return attention
