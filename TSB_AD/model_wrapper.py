@@ -6,7 +6,7 @@ import logging
 Unsupervise_AD_Pool = ['FFT', 'SR', 'NORMA', 'Series2Graph', 'Sub_IForest', 'IForest', 'LOF', 'Sub_LOF', 'POLY', 'MatrixProfile', 'Sub_PCA', 'PCA', 'HBOS', 
                         'Sub_HBOS', 'KNN', 'Sub_KNN','KMeansAD', 'KMeansAD_U', 'KShapeAD', 'COPOD', 'CBLOF', 'COF', 'EIF', 'RobustPCA', 'Lag_Llama', 'TimesFM', 'Chronos', 'MOMENT_ZS']
 Semisupervise_AD_Pool = ['Left_STAMPi', 'SAND', 'MCD', 'Sub_MCD', 'OCSVM', 'Sub_OCSVM', 'AutoEncoder', 'CNN', 'LSTMAD', 'TranAD', 'USAD', 'OmniAnomaly', 
-                        'AnomalyTransformer', 'TimesNet', 'FITS', 'Donut', 'OFA', 'MOMENT_FT', 'M2N2', 'SpikeCNN', 'ParallelSNN']
+                        'AnomalyTransformer', 'TimesNet', 'FITS', 'Donut', 'OFA', 'MOMENT_FT', 'M2N2', 'ParallelSNN']
 
 def run_Unsupervise_AD(model_name, data, **kwargs):
     try:
@@ -55,43 +55,6 @@ def run_CNN(data_train, data_test, TS_Name=None, local_running_params=None, **kw
     clf.fit(data_train)
     score = clf.decision_function(data_test)
     clf.clean_cuda()
-    return score.ravel()
-
-def run_SpikeCNN(data_train, data_test, # 데이터 
-             TS_Name=None, AD_Name=None, Encoder_Name=None, # 메타 데이터
-             local_running_params=None, # 하이퍼파라미터
-             window_size=100, num_channel=[32, 40], num_enc_features=8, lr=0.0008, n_jobs=1): # 하이퍼파라미터
-             
-    from .models.SpikeCNN import SpikeCNN
-
-    # zero_pruning 옵션이 켜져 있고, 실제로 모두 0인 컬럼이 하나라도 있을 때만 진입
-    if local_running_params['zero_pruning']:
-        mask = np.any(data_test != 0, axis=0)
-        num_zero = np.sum(~mask)
-        if num_zero > 0:
-            # 필요한 경우에만 슬라이싱 + 메모리 레이아웃 고정
-            data_train = np.ascontiguousarray(data_train[:, mask])
-            data_test  = np.ascontiguousarray(data_test[:, mask])
-
-    clf = SpikeCNN(TS_Name=TS_Name, AD_Name=AD_Name, Encoder_Name=Encoder_Name, # 메타 데이터
-               num_raw_features=data_test.shape[1], local_running_params=local_running_params)
-
-    try:
-        if local_running_params['load'] == False:
-            clf.fit(data_train)
-        score = clf.decision_function(data_test)
-        clf.clean_cuda()
-    except Exception as e:
-        import traceback
-        tb = traceback.extract_tb(e.__traceback__)
-        if tb:
-            last_call = tb[-1]
-            #print(f'SpikeCNN error in {last_call.filename} at line {last_call.lineno}: {e}')
-        else:
-            pass
-            #print(f'SpikeCNN error: {e}')
-        raise Exception(f'SpikeCNN error: {e}')
-    
     return score.ravel()
 
 def run_ParallelSNN(data_train, data_test, TS_Name=None, local_running_params=None, **kwargs): # 하이퍼파라미터

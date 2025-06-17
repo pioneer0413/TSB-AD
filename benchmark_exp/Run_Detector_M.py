@@ -32,13 +32,24 @@ print("CUDA available: ", torch.cuda.is_available())
 print("cuDNN version: ", torch.backends.cudnn.version())
 
 '''
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name dynamic --postfix
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name receptive --postfix
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name conv --postfix
-python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name delta --postfix
+사용법:
+
+python benchmark_exp/Run_Detector_M.py --AD_Name <your_ad_name> --Encoder_Name [your_encoder_name] --postfix [your_postfix]
+
+참고 및 권장사항:
+
+1. 결과 파일의 기본 양식은 다음과 같음: <id-code>_<AD_Name>_<Encoder_Name>_<postfix>.csv
+2. postfix에 여러 정보를 담아야 하는 경우, 구분자인 '_'(underscore)와 구분하기 위해 '-'(hyphen)로(예: 'postfix1-postfix2') 사용하는 것을 권장
+ 2.1. 가급적 postfix에 세 자리 이상 연속된 숫자를 사용하지 않는 것을 권장 (ID 코드와 혼동될 수 있음)
+3. AD_Name이 ParallelSNN인 경우를 제외하면 Encoder_Name은 사용할 필요 없으며, 미입력 시 None으로 설정됨
+4. !!중요!! 주요 파라미터 기본값은 TSB_AD/snn/params.py에 정의되어 있음
+5. dataset_name은 Datasets/File_List/TSB-AD-M-<keyword>-Eva.csv의 keyword와 일치해야 함(대소문자 구분 필요)
+
+예시:
+
+python benchmark_exp/Run_Detector_M.py --AD_Name CNN --postfix kpca-kmeans --dataset_name MSL
+python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name receptive --postfix k3n3n3
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name repeat --num_enc_features 1 --dataset_name GHL --batch_size 256 --postfix enc_features_1
-python benchmark_exp/Run_Detector_M.py --AD_Name CNN --postfix
-python benchmark_exp/Run_Detector_M.py --AD_Name SEWResNet --Encoder_Name conv --postfix
 '''
 
 if __name__ == '__main__':
@@ -92,8 +103,9 @@ if __name__ == '__main__':
     src_name = result_dir.split('/')[-1]
     lower_name = args.dataset_name.lower()
     result_dir = result_dir.replace(src_name, lower_name)
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir, exist_ok=True)
     local_running_params['data']['result_dir'] = result_dir
-
     local_running_params['data']['swap'] = args.channel_swap
     local_running_params['data']['shuffle'] = args.channel_shuffle
     local_running_params['data']['normalize'] = args.normalize
@@ -132,9 +144,7 @@ if __name__ == '__main__':
         f.write('\n')
         f.write('Execution Start Time: {}\n'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
-    # Check whether parameters are same as intended
-    # get standard input from console
-    # if input is 'y' or 'enter', continue the execution else remove log file and exit
+    # 파라미터가 올바른지 확인
     if args.skip is False:
         if input("Are the parameters correct? ([y]/n): ").strip().lower() not in ['y', '']:
             print("Parameters are not correct. Exiting...")
@@ -153,7 +163,6 @@ if __name__ == '__main__':
         if local_running_params['data']['normalize']:
             # channel-wise normalization
             df.iloc[:, :-1] = (df.iloc[:, :-1] - df.iloc[:, :-1].mean()) / (df.iloc[:, :-1].std() + 1e-8)
-
 
         assert not (local_running_params['data']['swap'] is True and local_running_params['data']['shuffle'] is True), "'swap' cannot co-exist with 'shuffle'."
 
