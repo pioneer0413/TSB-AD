@@ -22,69 +22,6 @@ class AdaptiveConcatPool1d(nn.Module):
     
     def forward(self, x):
         return torch.cat([self.ap(x), self.mp(x)], 1)
-    
-class TCA(nn.Module):
-    def __init__(self, num_features, window_size, reduction_ratio=0.5):
-        super().__init__()
-
-        self.ap = nn.AdaptiveAvgPool1d(1)
-        self.mp = nn.AdaptiveMaxPool1d(1)
-
-        #print(f"window_size: {window_size}, reduction_ratio: {reduction_ratio}")
-
-        self.fc1_t = nn.Linear(window_size, int(window_size * reduction_ratio))
-        self.fc2_t = nn.Linear(int(window_size * reduction_ratio), window_size)
-
-        self.fc1_c = nn.Linear(num_features, int(num_features * reduction_ratio))
-        self.fc2_c = nn.Linear(int(num_features * reduction_ratio), num_features)
-
-        self.relu = nn.ReLU(inplace=True)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        # x: (B, C, L)
-        x_t = self.temporal_attention(x.permute(0, 2, 1))  # (B, 1, L)
-        x_c = self.channel_attention(x)  # (B, C, 1)
-        return self.sigmoid(x_t * x_c)
-
-    def temporal_attention(self, x):
-        # x: (B, L, C)
-        #print(f"Input shape: {x.shape}")
-        x_avg = self.ap(x) # (B, L, 1) <- (B, L, C)
-        x_max = self.mp(x) # (B, L, 1) <- (B, L, C)
-
-        x_avg = self.fc1_t(x_avg.squeeze(-1))  # (B, L, C//reduction_ratio)
-        x_max = self.fc1_t(x_max.squeeze(-1))
-        
-        x_avg = self.relu(x_avg)
-        x_max = self.relu(x_max)
-        
-        x_avg = self.fc2_t(x_avg)
-        x_max = self.fc2_t(x_max)
-
-        x = x_avg + x_max  # (B, L)
-        return x.unsqueeze(1) # (B, 1, L)
-
-    def channel_attention(self, x):
-        # x: (B, C, L)
-        #x = x.permute(0, 2, 1)
-        #print(f"Input shape: {x.shape}")
-
-        x_avg = self.ap(x) # (B, C, 1)
-        #x_max = self.mp(x)
-
-        x_avg = self.fc1_c(x_avg.squeeze(-1))  # (B, L, C//reduction_ratio)
-        #x_max = self.fc1(x_max)
-        #print(x_avg.shape)
-        
-        x_avg = self.relu(x_avg)
-        #x_max = self.relu(x_max)
-        
-        x_avg = self.fc2_c(x_avg)
-        #x_max = self.fc2(x_max)
-
-        x = x_avg
-        return x.unsqueeze(2)  # (B, C, 1)
 
 class CNNModel(nn.Module):
     def __init__(self,
@@ -140,14 +77,9 @@ class CNNModel(nn.Module):
             torch.nn.Linear(self.num_channel[-1], self.num_raw_features)
         )
 
-        #self.tca = TCA(num_features=self.num_raw_features, window_size=self.local_running_params['model']['window_size'])
-
     def forward(self, x):
         b, l, c = x.shape
         x = x.view(b, c, l)
-
-        #attention = self.tca(x)  # [B, C, L] < [B, C, L]
-        #x = x * attention
 
         x = self.conv_layers(x)     # [128, feature, 23]
 

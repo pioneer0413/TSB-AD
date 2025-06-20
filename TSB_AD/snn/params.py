@@ -17,7 +17,7 @@ running_params = {
         'Encoder_Name': None,
         'postfix': None,
         'id_code': 0,
-        'base_file_name': None,
+        'base_file_name': '',
     },
 
     'analysis': {
@@ -33,6 +33,13 @@ running_params = {
         'validation_size': 0.2,
         'window_size': 50,
         'predict_time_steps': 1,
+    },
+
+    'CNNModel': {
+        'cuda': False,
+        'n_components': 16,
+        'kernel': 'poly',
+        'n_clusters': 8,
     },
 
     'ParallelSNNModel': {

@@ -169,7 +169,7 @@ def run_Sub_PCA(data, periodicity=1, n_components=None, n_jobs=1):
 
 def run_PCA(data, slidingWindow=100, n_components=None, n_jobs=1):
     from .models.PCA import PCA
-    clf = PCA(slidingWindow = slidingWindow, n_components=n_components, zero_pruning=False)
+    clf = PCA(slidingWindow = slidingWindow, n_components=n_components)
     clf.fit(data)
     score = clf.decision_scores_
     return score.ravel()

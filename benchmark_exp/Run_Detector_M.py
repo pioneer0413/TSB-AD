@@ -5,13 +5,13 @@
 import pandas as pd
 import numpy as np
 import torch
-import random, argparse, time, os, logging
+import random, argparse, time, os, logging, psutil
 from TSB_AD.evaluation.metrics import get_metrics
 from TSB_AD.utils.slidingWindows import find_length_rank
 from TSB_AD.model_wrapper import *
 from TSB_AD.HP_list import Optimal_Multi_algo_HP_dict
 from TSB_AD.snn.params import running_params
-from TSB_AD.snn.utils import get_last_number
+from TSB_AD.snn.utils import get_last_number, measure_block
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.cluster import KMeans
 from hummingbird.ml import convert
@@ -51,7 +51,6 @@ python benchmark_exp/Run_Detector_M.py --AD_Name CNN --postfix kpca-kmeans --dat
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name receptive --postfix k3n3n3
 python benchmark_exp/Run_Detector_M.py --AD_Name ParallelSNN --Encoder_Name repeat --num_enc_features 1 --dataset_name GHL --batch_size 256 --postfix enc_features_1
 '''
-
 if __name__ == '__main__':
 
     Start_T = time.time()
@@ -74,6 +73,12 @@ if __name__ == '__main__':
     parser.add_argument('--device_type', type=str, default='cuda', choices=['cpu', 'cuda'])
     parser.add_argument('--batch_size', type=int, default=running_params['model']['batch_size'])
     parser.add_argument('--window_size', type=int, default=running_params['model']['window_size'])
+
+    # model-specific(CNN)
+    parser.add_argument('--perf_cuda', action='store_true', default=running_params['CNNModel']['cuda'], help='Use CUDA for performance evaluation.')
+    parser.add_argument('--n_components', type=int, default=running_params['CNNModel']['n_components'], help='Number of diviends components for PCA.')
+    parser.add_argument('--kernel', type=str, default=running_params['CNNModel']['kernel'], choices=['linear', 'rbf', 'sigmoid', 'poly'], help='Kernel type for SVM.')
+    parser.add_argument('--n_clusters', type=int, default=running_params['CNNModel']['n_clusters'], help='Number of diviends for KMeans.')
 
     # model-specific(ParallelSNN)
     parser.add_argument('--num_enc_features', type=int, default=int(running_params['ParallelSNNModel']['num_enc_features']))
@@ -118,7 +123,12 @@ if __name__ == '__main__':
     local_running_params['model']['device_type'] = args.device_type
     local_running_params['model']['batch_size'] = args.batch_size
     local_running_params['model']['window_size'] = args.window_size
-    # model-specific
+    # model-specific(CNN)
+    local_running_params['CNNModel']['cuda'] = args.perf_cuda
+    local_running_params['CNNModel']['n_components'] = args.n_components
+    local_running_params['CNNModel']['kernel'] = args.kernel
+    local_running_params['CNNModel']['n_clusters'] = args.n_clusters
+    # model-specific(ParallelSNN)
     local_running_params['ParallelSNNModel']['num_enc_features'] = args.num_enc_features
     local_running_params['ParallelSNNModel']['norm_type'] = args.norm_type
     local_running_params['ParallelSNNModel']['dropout'] = args.dropout
@@ -154,6 +164,14 @@ if __name__ == '__main__':
     file_list = pd.read_csv(local_running_params['data']['file_list'])['file_name'].values
     Optimal_Det_HP = Optimal_Multi_algo_HP_dict[args.AD_Name]
 
+    '''
+    Performance 기록용
+    '''
+    ad_name = args.AD_Name.lower()
+    use_cuda = 'cudaO' if local_running_params['CNNModel']['cuda'] else 'cudaX'
+    save_path = f'/home/hwkang/dev-TSB-AD/TSB-AD/analyses/performance/{id_code}_{ad_name}_kpca_{lower_name}_{use_cuda}_perf.csv'
+    process = psutil.Process(os.getpid())
+
     write_csv = []
     for filename in file_list:
         
@@ -164,6 +182,7 @@ if __name__ == '__main__':
             # channel-wise normalization
             df.iloc[:, :-1] = (df.iloc[:, :-1] - df.iloc[:, :-1].mean()) / (df.iloc[:, :-1].std() + 1e-8)
 
+        '''
         assert not (local_running_params['data']['swap'] is True and local_running_params['data']['shuffle'] is True), "'swap' cannot co-exist with 'shuffle'."
 
         if local_running_params['data']['swap']:
@@ -191,52 +210,47 @@ if __name__ == '__main__':
             df = df[columns + [df.columns[-1]]]
             print(f'Original columns: {original_columns}')
             print(f'Shuffled columns: {df.columns.tolist()}')
-            
+        '''
+
         data = df.iloc[:, 0:-1].values.astype(float)
         label = df['Label'].astype(int).to_numpy()
 
         if local_running_params['data']['drop']:
-            # PCA
-            '''
-            C = data.shape[1]
-            variance_threshold = 0.9
-            pca_full = PCA(n_components=C)
-            pca_full.fit(data)
-            # 누적 설명력 계산
-            cumsum = np.cumsum(pca_full.explained_variance_ratio_)
-            k = np.searchsorted(cumsum, variance_threshold) + 1
-
-            # 상위 k개의 PC만 사용
-            components = pca_full.components_[:k, :]                  # shape: (k, C)
-            weights = pca_full.explained_variance_ratio_[:k]          # shape: (k,)
-
-            # 채널별 importance 계산 (가중 합)
-            importance = np.sum(np.abs(components) * weights[:, np.newaxis], axis=0)
-            importance = importance / np.sum(importance)  # normalize to sum = 1
-
-            # KMeans 클러스터링 (2개 클러스터)
-            kmeans = KMeans(n_clusters=2, random_state=0)
-            labels = kmeans.fit_predict(importance.reshape(-1, 1))  # shape: (C,)
-
-            # sort indices
-            indices = np.argsort(importance)[::-1]
-
-            # 가장 중요한 채널이 속한 클러스터의 채널만 선택
-            selected_indices = indices[labels[indices] == labels[indices[0]]]'''
-
             C = data.shape[1]
             # Kernel PCA with all C channels
-            kpca = KernelPCA(n_components=C, kernel='rbf', gamma=1.0, fit_inverse_transform=False)
-            kpca.fit(data)
+            arg_n_components = max(C-1, local_running_params['CNNModel']['n_components'])
+            kpca = KernelPCA(n_components=arg_n_components, kernel=local_running_params['CNNModel']['kernel'], gamma=1.0, fit_inverse_transform=False)
+
+            # Measure Performace of KPCA fit
+            _, (w_time, c_time, m_usage)= measure_block(process, kpca.fit, data, block_name="KPCA.fit")
+            kpca_fit_tup = (w_time, c_time, m_usage)
+
             kpca_pytorch = convert(kpca, 'torch')
             device = get_gpu(cuda=True)
             kpca_pytorch.to(device)
 
-            try:
-                base_transformed = kpca_pytorch.transform(data)
-            except:
-                print("Using sklearn KernelPCA")
+            start_time = time.time()
+            cpu_start = process.cpu_times()
+            mem_start = process.memory_info().rss
+
+            if use_cuda == 'cudaO':
+                try:
+                    base_transformed = kpca_pytorch.transform(data)
+                except:
+                    print("Using sklearn KernelPCA")
+                    base_transformed = kpca.transform(data)
+            else:
                 base_transformed = kpca.transform(data)
+            
+            end_time = time.time()
+            cpu_end = process.cpu_times()
+            mem_end = process.memory_info().rss
+
+            elapsed_time = end_time - start_time
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            mem_change = (mem_end - mem_start) / (1024 ** 2)
+
+            kpca_transform_tup = (elapsed_time, cpu_time, mem_change)
 
             # 중요도 추정: 각 채널의 영향도를 주성분의 projection에서 유도
             # kpca는 components_가 없음. 대신 eigenvectors_를 이용하거나 transformed 기반으로 channel별 중요도를 유추
@@ -244,6 +258,10 @@ if __name__ == '__main__':
             # 대체 방법: 각 채널을 제거해보며 출력 변화량 측정 (approximation)
             base_var = np.var(base_transformed, axis=0).sum()
             importances = []
+
+            start_time = time.time()
+            cpu_start = process.cpu_times()
+            mem_start = process.memory_info().rss
 
             for c in range(C):
                 masked_data = data.copy()
@@ -260,16 +278,30 @@ if __name__ == '__main__':
                     importance = 0.0
                 importances.append(importance)
 
+            end_time = time.time()
+            cpu_end = process.cpu_times()
+            mem_end = process.memory_info().rss
+
+            elapsed_time = end_time - start_time
+            cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+            mem_change = (mem_end - mem_start) / (1024 ** 2)
+
+            kpca_importance_tup = (elapsed_time, cpu_time, mem_change)
+
             # cuda cleanup
-            del kpca_pytorch
-            torch.cuda.empty_cache()
+            if use_cuda == 'cudaO':
+                del kpca_pytorch
+                torch.cuda.empty_cache()
 
             importances = np.array(importances)
             importances = importances / (np.sum(importances) + 1e-8)  # normalize
 
             # KMeans 클러스터링
-            kmeans = KMeans(n_clusters=2, random_state=0, n_init=10)
-            labels = kmeans.fit_predict(importances.reshape(-1, 1))  # shape: (C,)
+            arg_n_clusters = max(C-1, local_running_params['CNNModel']['n_clusters'])
+            kmeans = KMeans(n_clusters=arg_n_clusters, random_state=0, n_init=10)
+            labels, (w_time, c_time, m_usage) = measure_block(process, kmeans.fit_predict, importances.reshape(-1, 1), block_name="KMeans.fit_predict")
+
+            kmeans_fit_tup = (w_time, c_time, m_usage)
 
             # 가장 중요한 채널이 속한 클러스터 선택
             sorted_indices = np.argsort(importances)[::-1]
@@ -285,12 +317,59 @@ if __name__ == '__main__':
         data_train = data[:int(train_index), :]
 
         start_time = time.time()
+        cpu_start = process.cpu_times()
+        mem_start = process.memory_info().rss
 
         if args.AD_Name in Semisupervise_AD_Pool:
             output = run_Semisupervise_AD(data_train=data_train, data_test=data, TS_Name=filename, local_running_params=local_running_params, **Optimal_Det_HP)
         elif args.AD_Name in Unsupervise_AD_Pool:
             output = run_Unsupervise_AD(args.AD_Name, data, **Optimal_Det_HP)
-        
+
+        cpu_end = process.cpu_times()
+        mem_end = process.memory_info().rss
+        end_time = time.time()
+
+        elapsed_time = end_time - start_time
+        cpu_time = (cpu_end.user - cpu_start.user) + (cpu_end.system - cpu_start.system)
+        mem_change = (mem_end - mem_start) / (1024 ** 2)
+
+        model_tup = (elapsed_time, cpu_time, mem_change)
+
+        if local_running_params['data']['drop']:
+            record_dict = {
+                    'file_name': filename,
+                    'length': data.shape[0],
+                    'kpca_fit_time': kpca_fit_tup[0],
+                    'kpca_transform_time': kpca_transform_tup[0],
+                    'importance_time': kpca_importance_tup[0],
+                    'kmeans_time': kmeans_fit_tup[0],
+                    'model_time': model_tup[0],
+                    'kpca_fit_cpu_time': kpca_fit_tup[1],
+                    'kpca_transform_cpu_time': kpca_transform_tup[1],
+                    'importance_cpu_time': kpca_importance_tup[1],
+                    'kmeans_cpu_time': kmeans_fit_tup[1],
+                    'model_cpu_time': model_tup[1],
+                    'kpca_fit_mem': kpca_fit_tup[2],
+                    'kpca_transform_mem': kpca_transform_tup[2],
+                    'importance_mem': kpca_importance_tup[2],
+                    'kmeans_mem': kmeans_fit_tup[2],
+                    'model_mem': model_tup[2],
+                }
+            
+            # if there is no saved csv file, create a new one
+            if not os.path.exists(save_path):
+                # 'file_name' is the index column
+                save_df = pd.DataFrame(columns=record_dict.keys())
+                save_df.set_index('file_name', inplace=True)
+            else:
+                # append to the existing csv file
+                save_df = pd.read_csv(save_path, index_col='file_name')
+
+            row_df = pd.DataFrame([record_dict])
+            row_df.set_index('file_name', inplace=True)
+            save_df = pd.concat([save_df, row_df], axis=0)
+            save_df.to_csv(save_path)
+
         end_time = time.time()
         run_time = end_time - start_time
 

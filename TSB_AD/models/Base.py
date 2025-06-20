@@ -107,3 +107,40 @@ class BaseModule():
         if torch.cuda.is_available():
             gc.collect()
             torch.cuda.empty_cache()
+
+    def measure_time(self, data, min_run_time=100):
+        import torch.utils.benchmark as benchmark
+
+        # prepare dataloader
+        test_loader = DataLoader(
+            ForecastDataset(data, window_size=self.window_size, pred_len=self.predict_time_steps),
+            batch_size=self.batch_size,
+            shuffle=False
+        )
+
+        self.model.eval()
+        loop = list(test_loader)  # materialize dataloader once (torch.utils.benchmark requires it)
+
+        def run_model():
+            with torch.no_grad():
+                for x, target in loop:
+                    x, target = x.to(self.device), target.to(self.device)
+                    output = self.model(x)
+                    output = output.view(-1, self.num_raw_features * self.predict_time_steps)
+                    target = target.view(-1, self.num_raw_features * self.predict_time_steps)
+                    _ = torch.sub(output, target).pow(2)
+            if self.device.type == "cuda":
+                torch.cuda.synchronize()
+
+        # warmup
+        run_model()
+
+        # benchmarking
+        t = benchmark.Timer(
+            stmt="run_model()",
+            globals={"run_model": run_model},
+            num_threads=1
+        )
+
+        result = t.blocked_autorange(min_run_time=min_run_time)
+        return result

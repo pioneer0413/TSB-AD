@@ -19,3 +19,7 @@ wandb/
 analyses/MNIST/
 analyses/izhikevich/
 analyses/leaderboard/
+analyses/legacy/
+analyses/feature_importance/
+analyses/performance/
+tests/

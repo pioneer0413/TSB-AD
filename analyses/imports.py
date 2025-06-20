@@ -1,9 +1,10 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import matplotlib.colors as mcolors
 import seaborn as sns
 import numpy as np
-import matplotlib.patches as mpatches
 import colorsys
 import math
 from analyze_utils import PathLoader
