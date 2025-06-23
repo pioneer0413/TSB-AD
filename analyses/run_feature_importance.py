@@ -7,43 +7,7 @@ import argparse, time
 from sklearn.decomposition import KernelPCA
 from sklearn.cluster import KMeans
 
-def get_selected_indices(data, n_components, kernel, n_clusters):
-    n_samples, n_features = data.shape
-
-    temp_n_components = max(1, n_features//n_components)
-    kpca = KernelPCA(n_components=temp_n_components, kernel=kernel, gamma=1.0, fit_inverse_transform=False)
-    kpca.fit(data)
-
-    # --- Block 2: KPCA transform ---
-    base_transform = kpca.transform(data)
-    base_var = np.var(base_transform, axis=0).sum()
-
-    importances = []
-    for selected_feature in range(n_features):
-        masked_data = data.copy()
-        masked_data[:, selected_feature] = 0
-        try:
-            transformed_masked = kpca.transform(masked_data)
-            masked_var = np.var(transformed_masked, axis=0).sum()
-            importance = base_var - masked_var
-        except:
-            importance = 0.0
-        importances.append(importance)
-
-    importances = np.array(importances)
-    importances = importances / (np.sum(importances) + 1e-8)
-
-    # --- Block 4: KMeans clustering ---
-    temp_n_clusters = max(1, n_features // n_clusters)
-    kmeans = KMeans(n_clusters=temp_n_clusters, random_state=0, n_init=10)
-    labels = kmeans.fit_predict(importances.reshape(-1, 1))
-
-    # --- Post-processing ---
-    sorted_indices = np.argsort(importances)[::-1]
-    important_label = labels[sorted_indices[0]]
-    selected_indices = np.where(labels == important_label)[0]
-
-    return selected_indices, importances, labels, sorted_indices, important_label
+from TSB_AD.snn.utils import get_selected_indices
 
 '''
 Usage:
@@ -125,13 +89,11 @@ if __name__=='__main__':
                 data = df.iloc[:, :-1].values
                 label = df.iloc[:, -1].values
 
-                selected_indices, importances, labels, sorted_indices, important_label = get_selected_indices(data, n_components, kernel, n_clusters)
+                selected_indices, importances, labels, sorted_indices, important_label = get_selected_indices(data, n_components, kernel, n_clusters,
+                                                                                                              measure_time=False)
                 importances = (importances - np.min(importances)) / (np.max(importances) - np.min(importances) + 1e-8)
 
                 ax = axes[row, col]
-                #print(important_label)
-                #print(labels)
-                #print(importances)
                 colors = ['red' if labels[i] == important_label else 'blue' for i in range(len(importances))]
                 ax.bar(range(len(importances)), importances, color=colors, alpha=0.7)
                 

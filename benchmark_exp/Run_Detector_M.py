@@ -63,6 +63,7 @@ if __name__ == '__main__':
     parser.add_argument('--channel_shuffle', action='store_true', default=running_params['data']['shuffle'])
     parser.add_argument('--normalize', action='store_true', default=running_params['data']['normalize'], help='Apply channel-wise normalization.')
     parser.add_argument('--drop', action='store_true', default=running_params['data']['drop'], help='Apply PCA to drop less important channels.')
+    parser.add_argument('--zero_pruning', action='store_true', default=False, help='Apply zero pruning to remove channels with zero variance.')
 
     # meta
     parser.add_argument('--AD_Name', type=str, required=True)
@@ -115,6 +116,7 @@ if __name__ == '__main__':
     local_running_params['data']['shuffle'] = args.channel_shuffle
     local_running_params['data']['normalize'] = args.normalize
     local_running_params['data']['drop'] = args.drop
+    local_running_params['data']['zero_pruning'] = args.zero_pruning
     # Metadata
     local_running_params['meta']['AD_Name'] = args.AD_Name
     local_running_params['meta']['Encoder_Name'] = args.Encoder_Name
@@ -214,6 +216,10 @@ if __name__ == '__main__':
 
         data = df.iloc[:, 0:-1].values.astype(float)
         label = df['Label'].astype(int).to_numpy()
+
+        if local_running_params['data']['zero_pruning']:
+            selected_indices = [2]
+            data = data[:, selected_indices]
 
         if local_running_params['data']['drop']:
             C = data.shape[1]

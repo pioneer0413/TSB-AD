@@ -9,6 +9,7 @@ running_params = {
         'shuffle': False,
         'normalize': False,
         'drop': False,
+        'zero_pruning': False,
     },
 
     'meta': {
@@ -37,9 +38,9 @@ running_params = {
 
     'CNNModel': {
         'cuda': False,
-        'n_components': 16,
-        'kernel': 'poly',
-        'n_clusters': 8,
+        'n_components': 4,
+        'kernel': 'sigmoid',
+        'n_clusters': 3,
     },
 
     'ParallelSNNModel': {
