@@ -58,12 +58,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generating Anomaly Score')
 
     # data
+    parser.add_argument('--data_path', type=str, help='Path to the input data file.')
     parser.add_argument('--dataset_name', type=str, default='Tiny')
     parser.add_argument('--channel_swap', action='store_true', default=running_params['data']['swap'])
     parser.add_argument('--channel_shuffle', action='store_true', default=running_params['data']['shuffle'])
     parser.add_argument('--normalize', action='store_true', default=running_params['data']['normalize'], help='Apply channel-wise normalization.')
     parser.add_argument('--drop', action='store_true', default=running_params['data']['drop'], help='Apply PCA to drop less important channels.')
     parser.add_argument('--zero_pruning', action='store_true', default=False, help='Apply zero pruning to remove channels with zero variance.')
+    parser.add_argument('--mask', type=str, default=None, help='Channel mask to apply. Format: "110" for channels 1 and 2 active.')
 
     # meta
     parser.add_argument('--AD_Name', type=str, required=True)
@@ -74,6 +76,7 @@ if __name__ == '__main__':
     parser.add_argument('--device_type', type=str, default='cuda', choices=['cpu', 'cuda'])
     parser.add_argument('--batch_size', type=int, default=running_params['model']['batch_size'])
     parser.add_argument('--window_size', type=int, default=running_params['model']['window_size'])
+    parser.add_argument('--max_epochs', type=int, default=running_params['model']['max_epochs'], help='Maximum number of epochs for training.')
 
     # model-specific(CNN)
     parser.add_argument('--perf_cuda', action='store_true', default=running_params['CNNModel']['cuda'], help='Use CUDA for performance evaluation.')
@@ -117,6 +120,7 @@ if __name__ == '__main__':
     local_running_params['data']['normalize'] = args.normalize
     local_running_params['data']['drop'] = args.drop
     local_running_params['data']['zero_pruning'] = args.zero_pruning
+    local_running_params['data']['mask'] = args.mask
     # Metadata
     local_running_params['meta']['AD_Name'] = args.AD_Name
     local_running_params['meta']['Encoder_Name'] = args.Encoder_Name
@@ -125,6 +129,7 @@ if __name__ == '__main__':
     local_running_params['model']['device_type'] = args.device_type
     local_running_params['model']['batch_size'] = args.batch_size
     local_running_params['model']['window_size'] = args.window_size
+    local_running_params['model']['max_epochs'] = args.max_epochs
     # model-specific(CNN)
     local_running_params['CNNModel']['cuda'] = args.perf_cuda
     local_running_params['CNNModel']['n_components'] = args.n_components
@@ -174,10 +179,21 @@ if __name__ == '__main__':
     save_path = f'/home/hwkang/dev-TSB-AD/TSB-AD/analyses/performance/{id_code}_{ad_name}_kpca_{lower_name}_{use_cuda}_perf.csv'
     process = psutil.Process(os.getpid())
 
+    '''
+    mask 설정
+    '''
+    channel_mask = [int(b) for b in local_running_params['data']['mask']]
+    if local_running_params['data']['mask'] is not None:
+        file_list = [args.data_path]
+
     write_csv = []
     for filename in file_list:
         
         file_path = os.path.join(local_running_params['data']['dataset_dir'], filename)
+        if local_running_params['data']['mask'] is not None:
+            # mask가 설정된 경우, 해당 파일만 사용
+            file_path = args.data_path
+            filename = os.path.basename(file_path)
         df = pd.read_csv(file_path).dropna()
 
         if local_running_params['data']['normalize']:
@@ -217,8 +233,14 @@ if __name__ == '__main__':
         data = df.iloc[:, 0:-1].values.astype(float)
         label = df['Label'].astype(int).to_numpy()
 
+        if local_running_params['data']['mask'] is not None:
+            bit_seq = local_running_params['data']['mask']
+            selected_indices = [i for i, bit in enumerate(bit_seq) if bit == '1']
+            data = data[:, selected_indices]
+
         if local_running_params['data']['zero_pruning']:
-            selected_indices = [2]
+            selected_indices = [1, 2, 9] # Genesis
+            #selected_indices = [-2] # CreditCard
             data = data[:, selected_indices]
 
         if local_running_params['data']['drop']:
@@ -395,14 +417,36 @@ if __name__ == '__main__':
         record.insert(0, run_time)
         record.insert(0, filename)
 
-        ## Temp Save
-        col_w = ['file', 'Time'] + list(evaluation_result.keys())
-        csv_path = os.path.join(local_running_params['data']['result_dir'], local_running_params['meta']['base_file_name'] + '.csv')
-        row_df = pd.DataFrame([record], columns=col_w)
-        if not os.path.exists(csv_path):
-            row_df.to_csv(csv_path, index=False)
+        if local_running_params['data']['mask'] is not None:
+            tokens = filename.split('.')[0].split('_')
+            ts_name = '_'.join(tokens[:2])
+            # save_dir에 가장 하위 디렉터리를 제외하고 mask를 추가한 디렉터리 생성
+            temp = local_running_params['data']['result_dir'].split('/')[:-1]
+            save_dir = '/'.join(temp) + '/mask'
+            save_path = os.path.join(save_dir, f'{ts_name}.csv')
+            # if there is no directory, create it
+            if not os.path.exists(os.path.dirname(save_path)):
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+            # remove the first element (filename) and insert mask at the beginning
+            record = record[1:]  # remove filename
+            record.insert(0, local_running_params['data']['mask'])
+            col_w = ['mask', 'Time'] + list(evaluation_result.keys())
+            row_df = pd.DataFrame([record], columns=col_w)
+            if not os.path.exists(save_path):
+                row_df.to_csv(save_path, index=False)
+            else:
+                row_df.to_csv(save_path, mode='a', header=False, index=False)
+
         else:
-            row_df.to_csv(csv_path, mode='a', header=False, index=False)
+            ## Temp Save
+            col_w = ['file', 'Time'] + list(evaluation_result.keys())
+            csv_path = os.path.join(local_running_params['data']['result_dir'], local_running_params['meta']['base_file_name'] + '.csv')
+            row_df = pd.DataFrame([record], columns=col_w)
+            if not os.path.exists(csv_path):
+                row_df.to_csv(csv_path, index=False)
+            else:
+                row_df.to_csv(csv_path, mode='a', header=False, index=False)
         
     # logging 설정
     with open(log_file_path, 'a') as f:

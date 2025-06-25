@@ -10,6 +10,7 @@ running_params = {
         'normalize': False,
         'drop': False,
         'zero_pruning': False,
+        'mask': None,
     },
 
     'meta': {
